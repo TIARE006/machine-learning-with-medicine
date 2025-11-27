@@ -13,6 +13,8 @@ from sklearn.cluster import KMeans
 # 可选： "smallRNA" 或 "RNA"
 # =========================
 DATA_TYPE = "smallRNA"   # smallRNA 或 RNA
+RANDOM_STATE = 42
+np.random.seed(RANDOM_STATE)
 
 
 # =========================
@@ -147,10 +149,17 @@ plt.show()
 
 
 # =========================
-# 5. 用最佳 K 做最终聚类
+# 5. 用最佳 K 做最终聚类   
 # =========================
-kmeans = KMeans(n_clusters=best_k, random_state=42)
+kmeans = KMeans(
+    n_clusters=best_k,
+    random_state=RANDOM_STATE,
+    n_init=50
+)
 cluster_labels = kmeans.fit_predict(X_scaled)
+
+# kmeans = KMeans(n_clusters=best_k,random_state=42)
+# cluster_labels = kmeans.fit_predict(X_scaled)
 
 
 # =========================
