@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans
 # 可选： "smallRNA" 或 "RNA"
 # =========================
 DATA_TYPE = "smallRNA"   # smallRNA 或 RNA
+
 RANDOM_STATE = 42
 np.random.seed(RANDOM_STATE)
 
@@ -44,7 +45,7 @@ print(f"Using file: {file_path}")
 
 
 # =========================
-# 2. 读取并清洗数据（完全修复版）
+# 2. 读取并清洗数据
 # =========================
 df = pd.read_csv(file_path, low_memory=False)
 
@@ -83,7 +84,7 @@ X_scaled = scaler.fit_transform(X)
 
 
 # =========================
-# 4. 共识聚类（替代原来的 silhouette 选 K）
+# 4. 共识聚类
 # =========================
 def consensus_clustering(X, k_min=2, k_max=7, n_iter=50, subsample_rate=0.8):
     """
@@ -137,7 +138,7 @@ print("Consensus scores (K -> score):", consensus_scores)
 best_k = max(consensus_scores, key=consensus_scores.get)
 print("Best number of clusters selected by consensus clustering:", best_k)
 
-# 画一下共识得分随 K 的变化（可写进论文的图）
+# 画一下共识得分随 K 的变化
 plt.figure()
 plt.plot(list(consensus_scores.keys()),
          list(consensus_scores.values()),
