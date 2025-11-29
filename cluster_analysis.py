@@ -5,15 +5,16 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-
+from sklearn.cluster import DBSCAN
 
 # =========================
-# 聚类数据类型开关
-# 可选： "smallRNA" 或 "RNA"
+# 选择器
 # =========================
-DATA_TYPE = "smallRNA"   # smallRNA 或 RNA
+# 可选: "RNA" 或 "smallRNA"
+DATA_TYPE = "RNA"
+
+# 可选: "dbscan" 或 "hdbscan"
+METHOD = "dbscan"
 
 
 # =========================
@@ -38,12 +39,13 @@ elif DATA_TYPE == "RNA":
 else:
     raise ValueError("DATA_TYPE 必须是 'smallRNA' 或 'RNA'")
 
-print(f"Current clustering mode: {DATA_TYPE}")
+print(f"Current data type: {DATA_TYPE}")
 print(f"Using file: {file_path}")
+print(f"Clustering method: {METHOD}")
 
 
 # =========================
-# 2. 读取并清洗数据（完全修复版）
+# 2. 读取并清洗数据
 # =========================
 df = pd.read_csv(file_path, low_memory=False)
 
@@ -62,15 +64,14 @@ if "type" in df.columns:
 # 强制转为数值
 df = df.apply(pd.to_numeric, errors="coerce")
 
-# 只删除“整行全空”的情况
+# 只删除整行全空
 df = df.dropna(how="all")
 
-# 用 0 填补剩余 NaN（RNA表达中0是合理的）
+# 剩余 NaN 用 0 填补
 df = df.fillna(0)
 
 # 转置：样本为行
 X = df.T
-
 print("Expression matrix shape:", X.shape)
 
 
@@ -82,71 +83,125 @@ X_scaled = scaler.fit_transform(X)
 
 
 # =========================
-# 4. 寻找最佳聚类数
+# 4. 聚类：DBSCAN / HDBSCAN
 # =========================
-range_n_clusters = range(2, 8)
-silhouette_scores = []
+labels = None
 
-for k in range_n_clusters:
-    kmeans = KMeans(n_clusters=k, random_state=42)
-    labels = kmeans.fit_predict(X_scaled)
-    silhouette_scores.append(silhouette_score(X_scaled, labels))
+if METHOD.lower() == "dbscan":
+    # ===== 自动扫一遍 eps，选择能分出 cluster 的参数 =====
+    eps_list = [0.5, 1, 2, 3, 5, 8, 10]   # 可以根据需要再加
+    best_eps = None
+    best_n_clusters = -1
+    best_labels = None
 
-plt.figure()
-plt.plot(range_n_clusters, silhouette_scores, marker='o')
-plt.xlabel("Number of clusters (k)")
-plt.ylabel("Silhouette Score")
-plt.title(f"Silhouette Analysis ({DATA_TYPE})")
-plt.show()
+    for eps in eps_list:
+        db = DBSCAN(eps=eps, min_samples=3)   # min_samples 放宽一点
+        tmp_labels = db.fit_predict(X_scaled)
 
-best_k = range_n_clusters[np.argmax(silhouette_scores)]
-print("Best number of clusters:", best_k)
+        # 计算该 eps 下的簇数（排除噪声 -1）
+        uniq = set(tmp_labels)
+        n_clusters_tmp = len([l for l in uniq if l != -1])
+        n_noise_tmp = np.sum(tmp_labels == -1)
+
+        print(f"eps={eps}: clusters={n_clusters_tmp}, noise={n_noise_tmp}")
+
+        # 选出簇数最多、且至少有 1 个簇的 eps
+        if n_clusters_tmp > best_n_clusters and n_clusters_tmp > 0:
+            best_n_clusters = n_clusters_tmp
+            best_eps = eps
+            best_labels = tmp_labels
+
+    if best_labels is None:
+        # 如果所有 eps 都没分出簇，就退回最后一个 eps 的结果
+        print("所有 eps 都没有形成有效簇，使用最后一次结果（可能全是噪声）")
+        db = DBSCAN(eps=eps_list[-1], min_samples=3)
+        best_labels = db.fit_predict(X_scaled)
+        best_eps = eps_list[-1]
+        uniq = set(best_labels)
+        best_n_clusters = len([l for l in uniq if l != -1])
+
+    labels = np.array(best_labels)
+    print(f"最终选择 eps = {best_eps}, clusters = {best_n_clusters}")
+
+elif METHOD.lower() == "hdbscan":
+    try:
+        import hdbscan
+    except ImportError:
+        raise ImportError(
+            "需要先安装 hdbscan: pip install hdbscan "
+            "（建议在 subtypegan_py 环境里安装）"
+        )
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=5)
+    labels = clusterer.fit_predict(X_scaled)
+
+else:
+    raise ValueError("METHOD 必须是 'dbscan' 或 'hdbscan'")
+
+labels = np.array(labels)
+unique_labels = set(labels)
+n_clusters = len([l for l in unique_labels if l != -1])
+n_noise = np.sum(labels == -1)
+
+print(f"{METHOD.upper()} found {n_clusters} clusters")
+print(f"Number of noise samples: {n_noise}")
+
 
 
 # =========================
-# 5. 执行最终聚类
-# =========================
-kmeans = KMeans(n_clusters=best_k, random_state=42)
-cluster_labels = kmeans.fit_predict(X_scaled)
-
-
-# =========================
-# 6. PCA 可视化
+# 5. PCA 可视化
 # =========================
 pca = PCA(n_components=2)
 X_pca = pca.fit_transform(X_scaled)
 
 plt.figure()
-plt.scatter(X_pca[:, 0], X_pca[:, 1])
+mask_core = labels != -1
+mask_noise = labels == -1
+
+# 聚类点
+plt.scatter(
+    X_pca[mask_core, 0],
+    X_pca[mask_core, 1],
+    c=labels[mask_core],
+    cmap="viridis",
+    label="clusters"
+)
+
+# 噪声点（如果有）
+if n_noise > 0:
+    plt.scatter(
+        X_pca[mask_noise, 0],
+        X_pca[mask_noise, 1],
+        c="lightgray",
+        marker="x",
+        label="noise"
+    )
+
 plt.xlabel("PC1")
 plt.ylabel("PC2")
-plt.title(f"PCA Visualization ({DATA_TYPE}, k={best_k})")
+plt.title(f"PCA Visualization with {METHOD.upper()} ({DATA_TYPE})")
+plt.legend()
 plt.show()
 
 
 # =========================
-# 7. 保存结果（分类存放到 data 目录）
+# 6. 保存结果到 data 下（按类型分类 + 不同命名）
 # =========================
-
-# 根据数据类型选择输出文件夹
 if DATA_TYPE == "smallRNA":
     output_dir = os.path.join(BASE_DIR, "data", "small RNA-seq")
 else:
     output_dir = os.path.join(BASE_DIR, "data", "RNA-seq")
 
-# 如果文件夹不存在则创建
 os.makedirs(output_dir, exist_ok=True)
+
+method_tag = METHOD.lower()  # dbscan / hdbscan
 
 result = pd.DataFrame({
     "Sample_ID": X.index,
-    "Cluster": cluster_labels
+    "Cluster": labels    # 注意: -1 表示噪声
 })
 
-result_path = os.path.join(
-    output_dir,
-    f"cluster_results_{DATA_TYPE}.csv"
-)
-
+out_name = f"cluster_{method_tag}_{DATA_TYPE}.csv"
+result_path = os.path.join(output_dir, out_name)
 result.to_csv(result_path, index=False)
 
 print(f"Cluster results saved to: {result_path}")

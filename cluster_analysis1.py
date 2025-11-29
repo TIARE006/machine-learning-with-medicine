@@ -12,42 +12,50 @@ from sklearn.cluster import KMeans
 # 聚类数据类型开关 
 # 可选： "smallRNA" 或 "RNA"
 # =========================
-DATA_TYPE = "smallRNA"   # smallRNA 或 RNA
+DATA_TYPE = "RNA"   # "smallRNA" 或 "RNA"
 
 RANDOM_STATE = 42
 np.random.seed(RANDOM_STATE)
 
 
 # =========================
-# 1. 根据开关选择数据路径
+# 1. 路径设置：raw 输入 & clustering 输出
 # =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if DATA_TYPE == "smallRNA":
-    file_path = os.path.join(
+    expr_file = os.path.join(
         BASE_DIR,
         "data",
         "small RNA-seq",
+        "raw",
         "GSE254878_smallRNAs_raw_counts_expression.csv"
     )
+    out_base = os.path.join(BASE_DIR, "data", "small RNA-seq")
 elif DATA_TYPE == "RNA":
-    file_path = os.path.join(
+    expr_file = os.path.join(
         BASE_DIR,
         "data",
         "RNA-seq",
+        "raw",
         "GSE254877_raw_counts_expression.csv"
     )
+    out_base = os.path.join(BASE_DIR, "data", "RNA-seq")
 else:
     raise ValueError("DATA_TYPE 必须是 'smallRNA' 或 'RNA'")
 
+# 聚类结果和图统一放在 clustering 子目录
+clustering_dir = os.path.join(out_base, "clustering")
+os.makedirs(clustering_dir, exist_ok=True)
+
 print(f"Current clustering mode: {DATA_TYPE}")
-print(f"Using file: {file_path}")
+print(f"Using file: {expr_file}")
 
 
 # =========================
 # 2. 读取并清洗数据
 # =========================
-df = pd.read_csv(file_path, low_memory=False)
+df = pd.read_csv(expr_file, low_memory=False)
 
 # 删除第一行异常描述行
 df = df.drop(index=0)
@@ -108,7 +116,10 @@ def consensus_clustering(X, k_min=2, k_max=7, n_iter=50, subsample_rate=0.8):
             )
             X_sub = X[idx]
 
-            labels = KMeans(n_clusters=k, random_state=None).fit_predict(X_sub)
+            labels = KMeans(
+                n_clusters=k,
+                random_state=None
+            ).fit_predict(X_sub)
 
             # 在子样本内部更新共识矩阵
             for i in range(len(idx)):
@@ -138,7 +149,7 @@ print("Consensus scores (K -> score):", consensus_scores)
 best_k = max(consensus_scores, key=consensus_scores.get)
 print("Best number of clusters selected by consensus clustering:", best_k)
 
-# 画一下共识得分随 K 的变化
+# 画一下共识得分随 K 的变化，并保存到 clustering 目录
 plt.figure()
 plt.plot(list(consensus_scores.keys()),
          list(consensus_scores.values()),
@@ -159,9 +170,6 @@ kmeans = KMeans(
 )
 cluster_labels = kmeans.fit_predict(X_scaled)
 
-# kmeans = KMeans(n_clusters=best_k,random_state=42)
-# cluster_labels = kmeans.fit_predict(X_scaled)
-
 
 # =========================
 # 6. PCA 可视化
@@ -178,27 +186,16 @@ plt.show()
 
 
 # =========================
-# 7. 保存结果（分类存放到 data 目录）
+# 7. 保存聚类结果（到 clustering 目录）
 # =========================
-
-# 根据数据类型选择输出文件夹
-if DATA_TYPE == "smallRNA":
-    output_dir = os.path.join(BASE_DIR, "data", "small RNA-seq")
-else:
-    output_dir = os.path.join(BASE_DIR, "data", "RNA-seq")
-
-os.makedirs(output_dir, exist_ok=True)
-
 result = pd.DataFrame({
     "Sample_ID": X.index,
     "Cluster": cluster_labels
 })
 
 result_path = os.path.join(
-    output_dir,
-    f"cluster_results_{DATA_TYPE}.csv"
+    clustering_dir,
+    f"cluster_results_{DATA_TYPE}_seed{RANDOM_STATE}.csv"
 )
-
 result.to_csv(result_path, index=False)
-
 print(f"Cluster results saved to: {result_path}")
