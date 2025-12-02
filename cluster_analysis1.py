@@ -187,7 +187,7 @@ plt.show()
 
 # =========================
 # 7. 保存聚类结果（到 clustering 目录）
-# =========================
+# =========================##
 result = pd.DataFrame({
     "Sample_ID": X.index,
     "Cluster": cluster_labels
