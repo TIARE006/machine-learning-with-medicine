@@ -1,3 +1,23 @@
+# RNA & smallRNA Analysis Pipeline: Clustering, Differential Expression, and Pathway Enrichment
+
+## Project Overview
+
+This project implements a complete analysis pipeline for two GEO datasets:
+
+- **small RNA-seq (GSE254878)**
+- **RNA-seq (GSE254877)**
+
+The pipeline performs four major steps:
+
+1. **Unsupervised clustering** based on normalized expression data  
+2. **Differential expression analysis (DEG)** using strict and relaxed thresholds  
+3. **Target gene mapping** for small RNA (miRNA → mRNA) through curated reference tables  
+4. **GO Biological Process pathway enrichment**, for both directly differential genes and miRNA-derived target genes
+
+All intermediate and final outputs — clustering labels, DEG tables, gene lists, and pathway enrichment results — are saved under a structured `data/` directory.
+
+---
+
 # Data Folder Overview
 
 This folder contains all data used by the clustering and DEG + pathway analysis pipelines for:
