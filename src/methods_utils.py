@@ -1,3 +1,4 @@
+import re
 import os
 import numpy as np
 import pandas as pd
@@ -9,10 +10,13 @@ import gseapy as gp
 # =====================================================
 RANDOM_STATE = 42               # 和聚类脚本里的 seed 一致
 TOP_N        = 200              # 导出 p 最小的前 N 个
-STRICT_FDR   = 0.05
-STRICT_LOG2FC = 1.0
-RELAX_FDR     = 0.10
-RELAX_LOG2FC  = 0.50
+STRICT_FDR   = 0.10
+STRICT_LOG2FC = 0.8
+
+RELAX_FDR     = 0.25
+
+RELAX_P       = 0.01   # 或 0.05，看你想多宽松
+RELAX_LOG2FC  = 0.30
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -30,6 +34,20 @@ LNCRNA_MIRNA_FILE = os.path.join(
 # =====================================================
 # 工具函数
 # =====================================================
+def simplify_sample_id(s: str):
+    """
+    把原始样本名简化成病人 ID，比如：
+    RNA:   NS.1402.003.NEBNext_dual_i7_177---NEBNext_dual_i5_177.2066_R1.bam -> '2066'
+    miRNA: NS.1404.001.NEBNext_S02.2066                                     -> '2066'
+    """
+    s = str(s)
+    if "Unnamed" in s:
+        return None  # 明显是多余列
+    nums4 = re.findall(r"(\d{4})", s)
+    if nums4:
+        return nums4[-1]
+    return s.strip()
+
 def bh_fdr(pvals: np.ndarray) -> np.ndarray:
     """Benjamini-Hochberg FDR 校正"""
     pvals = np.asarray(pvals, dtype=float)
@@ -134,6 +152,122 @@ def load_expression_and_clusters(data_type: str, seed: int):
 
     return X, labels, deg_dir, pathway_dir, targets_dir
 
+def load_expression_and_snf_clusters(data_type: str,
+                                     seed: int,
+                                     cluster_source: str = "SNF"):
+    """
+    使用 SNF / EarlyFusion 多组学聚类结果作为统一标签。
+
+    data_type: 'smallRNA'、'RNA' 或 'lncRNA'
+    cluster_source: 'SNF' 或 'EarlyFusion'
+
+    返回:
+        X: (样本 × 特征) DataFrame，索引为简化后的 Sample_ID (2066, 3005, ...)
+        labels: SNF / EarlyFusion 的聚类标签 (numpy array)
+        deg_dir, pathway_dir, targets_dir: 输出目录
+    """
+    # ---------- 1) 各组学表达矩阵路径 ----------
+    if data_type == "smallRNA":
+        expr_file = os.path.join(
+            BASE_DIR, "data", "small RNA-seq", "raw",
+            "GSE254878_smallRNAs_raw_counts_expression.csv"
+        )
+        base_out = os.path.join(BASE_DIR, "data", "small RNA-seq")
+
+    elif data_type == "RNA":
+        expr_file = os.path.join(
+            BASE_DIR, "data", "RNA-seq", "raw",
+            "GSE254877_raw_counts_expression.csv"
+        )
+        base_out = os.path.join(BASE_DIR, "data", "RNA-seq")
+
+    elif data_type == "lncRNA":
+        expr_file = os.path.join(
+            BASE_DIR, "data", "lncRNA-seq", "raw",
+            "GSE254877_lncRNA_raw_counts_expression.csv"
+        )
+        base_out = os.path.join(BASE_DIR, "data", "lncRNA-seq")
+
+    else:
+        raise ValueError("data_type 必须是 'smallRNA'、'RNA' 或 'lncRNA'")
+
+    # ---------- 2) SNF / EarlyFusion 聚类结果 ----------
+    # 统一用 integrated_results 里的多组学聚类
+    cluster_file = os.path.join(
+        BASE_DIR, "data", "integrated_results",
+        f"cluster_results_{cluster_source}_RNA_miRNA_seed{seed}.csv"
+    )
+
+    print(f"\n===== [{data_type}] Load data (driven by {cluster_source}) =====")
+    print(f"[INFO] Using expression file: {expr_file}")
+    print(f"[INFO] Using cluster file   : {cluster_file}")
+
+    if not os.path.exists(expr_file):
+        raise FileNotFoundError(f"表达矩阵不存在: {expr_file}")
+    if not os.path.exists(cluster_file):
+        raise FileNotFoundError(f"聚类结果不存在: {cluster_file}")
+
+    # ---------- 3) 读表达矩阵，并把样本名简化成病人 ID ----------
+    df = pd.read_csv(expr_file, low_memory=False)
+    df = df.drop(index=0)          # 第一行注释
+    gene_col = df.columns[0]
+    df = df.set_index(gene_col)
+
+    if "type" in df.columns:
+        df = df.drop(columns=["type"])
+
+    df = df.apply(pd.to_numeric, errors="coerce")
+    df = df.dropna(how="all").fillna(0)
+
+    X = df.T
+    X.index = X.index.astype(str).str.strip()
+
+    # 简化样本名 -> 病人 ID
+    simple_ids = [simplify_sample_id(s) for s in X.index]
+    X["__SIMPLE_ID__"] = simple_ids
+    X = X[~X["__SIMPLE_ID__"].isna()].copy()
+    X = X.drop_duplicates(subset="__SIMPLE_ID__", keep="first")
+    X = X.set_index("__SIMPLE_ID__")
+
+    print(f"[INFO] Expression matrix shape after ID simplify: {X.shape}")
+    print(f"[DEBUG] Simplified sample IDs (head): {list(X.index[:5])}")
+
+    # ---------- 4) 读 SNF / EarlyFusion 聚类标签并对齐 ----------
+    clust = pd.read_csv(cluster_file).set_index("Sample_ID")
+    # 把 Sample_ID 统一转成字符串，保证和 X.index 对得上
+    clust.index = clust.index.astype(str).str.strip()
+
+    if cluster_source.upper() == "SNF":
+        label_col = "Cluster_SNF"
+    else:
+        label_col = "Cluster_EarlyFusion"
+
+    if label_col not in clust.columns:
+        raise KeyError(f"聚类结果文件中找不到列: {label_col}")
+
+    common_samples = sorted(set(X.index) & set(clust.index))
+    print(f"[INFO] Common samples (expr ∩ {cluster_source}): {len(common_samples)}")
+
+    if len(common_samples) == 0:
+        raise ValueError("表达矩阵和 SNF 聚类文件没有共同的 Sample_ID，检查样本名。")
+
+    X = X.loc[common_samples]
+    labels = clust.loc[common_samples, label_col].values
+
+    print(f"[INFO] Loaded {cluster_source} cluster labels, k = {len(np.unique(labels))}")
+    print(f"[INFO] Cluster counts:\n{pd.Series(labels).value_counts()}")
+
+    # ---------- 5) 输出目录（单独给 SNF / EarlyFusion 一个子目录） ----------
+    deg_dir     = os.path.join(base_out, f"deg_{cluster_source}")
+    pathway_dir = os.path.join(base_out, f"pathway_{cluster_source}")
+    targets_dir = os.path.join(base_out, f"targets_{cluster_source}")
+    os.makedirs(deg_dir, exist_ok=True)
+    os.makedirs(pathway_dir, exist_ok=True)
+    os.makedirs(targets_dir, exist_ok=True)
+
+    return X, labels, deg_dir, pathway_dir, targets_dir
+
+
 
 def compute_deg(X_df: pd.DataFrame,
                 labels: np.ndarray,
@@ -225,13 +359,24 @@ def save_deg_tables(deg: pd.DataFrame,
     print(f"[SAVE] Top {TOP_N} DEG (by p-value) -> {top_path}")
 
     # 宽松版（给富集 & target 映射 & overlap / ceRNA 用）
-    print(f"[INFO] Using relaxed cutoff: FDR<{RELAX_FDR}, |log2FC|>{RELAX_LOG2FC}")
-    relaxed = deg[(deg["FDR"] < RELAX_FDR) &
+    # print(f"[INFO] Using relaxed cutoff: FDR<{RELAX_FDR}, |log2FC|>{RELAX_LOG2FC}")
+    # relaxed = deg[(deg["FDR"] < RELAX_FDR) &
+    #               (deg["log2FC"].abs() > RELAX_LOG2FC)]
+    # relaxed_path = os.path.join(
+    #     deg_dir,
+    #     f"DEG_sig_relaxed_{data_type}_FDR{RELAX_FDR}_log2FC{RELAX_LOG2FC}_seed{seed}.csv"
+    # )
+
+    # 宽松版（探索性）：不用 FDR，只看原始 p 值 + log2FC
+    print(f"[INFO] Using relaxed cutoff (exploratory): p<{RELAX_P}, |log2FC|>{RELAX_LOG2FC}")
+    relaxed = deg[(deg["p_value"] < RELAX_P) &
                   (deg["log2FC"].abs() > RELAX_LOG2FC)]
+
     relaxed_path = os.path.join(
         deg_dir,
-        f"DEG_sig_relaxed_{data_type}_FDR{RELAX_FDR}_log2FC{RELAX_LOG2FC}_seed{seed}.csv"
+        f"DEG_sig_relaxed_{data_type}_p{RELAX_P}_log2FC{RELAX_LOG2FC}_seed{seed}.csv"
     )
+
     relaxed.to_csv(relaxed_path, index=False)
     print(f"[SAVE] Relaxed significant DEGs -> {relaxed_path}")
     print(f"[INFO] #Relaxed DEGs: {relaxed.shape[0]}")
