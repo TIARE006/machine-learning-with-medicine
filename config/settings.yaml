@@ -1,0 +1,7 @@
+seed: 42
+deg:
+  p_cutoff: 0.01
+  log2FC_cutoff: 0.3
+snf:
+  K: 20
+  t: 20
