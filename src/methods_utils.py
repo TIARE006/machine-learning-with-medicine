@@ -1,5 +1,6 @@
 import re
 import os
+import subprocess
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
@@ -29,6 +30,8 @@ MIRNA_TARGET_FILE = os.path.join(
 LNCRNA_MIRNA_FILE = os.path.join(
     BASE_DIR, "data", "reference", "lncrna_mirna_human.csv"
 )
+
+R_DESEQ2_SCRIPT = os.path.join(BASE_DIR, "R", "run_deseq2_by_snf.R")
 
 
 # =====================================================
@@ -811,3 +814,128 @@ def postprocess_mirna_mrna_triplets(seed: int = RANDOM_STATE):
         label="miR_down_RNA_up_targets",
         out_prefix="GO_miRdown_RNAup_targets",
     )
+
+    # src/methods_utils.py 顶部已经有 import os, np, pd 等
+
+def load_external_deg(deg_path: str) -> pd.DataFrame:
+    """
+    从外部（例如 DESeq2）导出的 DEG 结果里，
+    提取统一的四列: gene, log2FC, p_value, FDR
+
+    要求：
+      - 至少包含以下几列中的一种命名形式：
+          gene / rownames
+          log2FC 或 log2FoldChange
+          p_value 或 pvalue
+          FDR 或 padj
+    """
+    if not os.path.exists(deg_path):
+        raise FileNotFoundError(f"External DEG file not found: {deg_path}")
+
+    df = pd.read_csv(deg_path)
+
+    # ---- 列名适配（兼容 DESeq2 默认列名）----
+    col_map = {}
+
+    # 基因名
+    if "gene" in df.columns:
+        pass
+    elif "rownames" in df.columns:
+        col_map["rownames"] = "gene"
+
+    # log2FC
+    if "log2FC" not in df.columns:
+        if "log2FoldChange" in df.columns:
+            col_map["log2FoldChange"] = "log2FC"
+
+    # p 值
+    if "p_value" not in df.columns:
+        if "pvalue" in df.columns:
+            col_map["pvalue"] = "p_value"
+
+    # FDR / padj
+    if "FDR" not in df.columns:
+        if "padj" in df.columns:
+            col_map["padj"] = "FDR"
+
+    if col_map:
+        df = df.rename(columns=col_map)
+
+    needed = ["gene", "log2FC", "p_value", "FDR"]
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise ValueError(
+            f"External DEG file {deg_path} 缺少列: {missing}；"
+            f"请在 R 里导出 gene, log2FC, p_value, FDR 这几列。"
+        )
+
+    # 只保留核心四列，后面 save_deg_tables 会另外再写一份自己的 full 表
+    df = df[needed].copy()
+    return df
+
+
+def load_deg_full_from_deseq2(data_type: str, seed: int, base_dir: str = BASE_DIR) -> pd.DataFrame:
+    """
+    从 R-DESeq2 输出的 full DEG 表中读取结果。
+    data_type: "RNA_SNF", "smallRNA_SNF", "lncRNA_SNF"
+    返回的 DataFrame 必须至少包含: ['gene', 'log2FC', 'p_value', 'FDR']
+    """
+    if data_type == "RNA_SNF":
+        path = os.path.join(
+            base_dir, "data", "RNA-seq", "deg_SNF",
+            f"DEG_full_RNA_SNF_seed{seed}.csv"
+        )
+    elif data_type == "smallRNA_SNF":
+        path = os.path.join(
+            base_dir, "data", "small RNA-seq", "deg_SNF",
+            f"DEG_full_smallRNA_SNF_seed{seed}.csv"
+        )
+    elif data_type == "lncRNA_SNF":
+        path = os.path.join(
+            base_dir, "data", "lncRNA-seq", "deg_SNF",
+            f"DEG_full_lncRNA_SNF_seed{seed}.csv"
+        )
+    else:
+        raise ValueError(f"Unsupported data_type: {data_type}")
+
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"R-DESeq2 DEG file not found: {path}")
+
+    deg = pd.read_csv(path)
+    required = {"gene", "log2FC", "p_value", "FDR"}
+    if not required.issubset(deg.columns):
+        raise ValueError(
+            f"DEG file {path} missing required columns: {required - set(deg.columns)}"
+        )
+    return deg
+
+
+def run_r_deseq2_by_snf():
+    """
+    调用 Rscript 运行 run_deseq2_by_snf.R
+    - 前提：R 安装好了，命令行能直接用 `Rscript`
+    - 脚本会生成：
+        data/RNA-seq/deg_SNF/DEG_full_RNA_SNF_seed42.csv
+        data/small RNA-seq/deg_SNF/DEG_full_smallRNA_SNF_seed42.csv
+        data/lncRNA-seq/deg_SNF/DEG_full_lncRNA_SNF_seed42.csv
+    """
+    print("\n===== [STEP 1.5] Run R-based DESeq2 DEG by SNF clusters =====")
+    if not os.path.exists(R_DESEQ2_SCRIPT):
+        raise FileNotFoundError(f"R script not found: {R_DESEQ2_SCRIPT}")
+
+    cmd = ["Rscript", R_DESEQ2_SCRIPT]
+
+    # 如果你想看 R 的输出，下面这样打印 stdout/stderr
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    print("----- [R OUTPUT] stdout -----")
+    print(result.stdout)
+    print("----- [R OUTPUT] stderr -----")
+    print(result.stderr)
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"R DESeq2 pipeline failed with exit code {result.returncode}"
+        )
+
+    print("===== [STEP 1.5] R-based DESeq2 DEG finished. =====\n")

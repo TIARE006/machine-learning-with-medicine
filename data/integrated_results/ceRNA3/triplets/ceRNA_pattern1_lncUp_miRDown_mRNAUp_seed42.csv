@@ -1,1 +1,14 @@
 lncRNA,miRNA,TargetGene,lncRNA_regulation,miRNA_regulation,RNA_regulation
+ITPK1-AS1,hsa-miR-22-3p,BUB1B,up,down,up
+ITPK1-AS1,hsa-miR-22-3p,HTR2C,up,down,up
+ITPK1-AS1,hsa-miR-22-3p,E2F2,up,down,up
+ADORA2A-AS1,hsa-miR-22-3p,BUB1B,up,down,up
+ADORA2A-AS1,hsa-miR-22-3p,HTR2C,up,down,up
+ADORA2A-AS1,hsa-miR-22-3p,E2F2,up,down,up
+SMAD5-AS1,hsa-miR-22-3p,BUB1B,up,down,up
+SMAD5-AS1,hsa-miR-22-3p,HTR2C,up,down,up
+SMAD5-AS1,hsa-miR-22-3p,E2F2,up,down,up
+MIR137HG,hsa-miR-30d-3p,CAMKV,up,down,up
+LINC00661,hsa-miR-30d-3p,CAMKV,up,down,up
+LIMD1-AS1,hsa-miR-30d-3p,CAMKV,up,down,up
+TSIX,hsa-miR-30d-3p,CAMKV,up,down,up
