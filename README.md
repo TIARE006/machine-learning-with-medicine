@@ -189,12 +189,8 @@ MACHINE-LEARNING-WITH-...
 
 ## Folder-by-Folder Description
 
----
-
 ## 1. `small RNA-seq/`
 用于处理 **GSE254878 small RNA-seq** 数据的所有文件。
-
----
 
 ###  `raw/` — 原始表达矩阵
 
@@ -205,8 +201,6 @@ MACHINE-LEARNING-WITH-...
 - 第一行为描述行（自动移除）  
 - 第一列为 feature ID  
 
----
-
 ###  `clustering/` — 聚类结果
 
 **cluster_results_smallRNA_seed42.csv**  
@@ -215,8 +209,6 @@ MACHINE-LEARNING-WITH-...
 - `Cluster`（0/1/...）  
 
 用于后续 DEG 分析。
-
----
 
 ###  `deg/` — 差异表达（DEG）结果  
 由 `de_analysis_pipeline.py`（DATA_TYPE="smallRNA"）自动生成。
@@ -242,8 +234,6 @@ MACHINE-LEARNING-WITH-...
 - **DEG_up_genes_smallRNA_seed42.txt** — 上调 smallRNAs  
 - **DEG_down_genes_smallRNA_seed42.txt** — 下调 smallRNAs  
 
----
-
 ###  `pathway/` — SmallRNA 与其 Target 的 GO-BP 富集
 
 - **Pathway_up_smallRNA_seed42.csv** — 上调 smallRNAs 的 GO-BP 富集  
@@ -251,21 +241,13 @@ MACHINE-LEARNING-WITH-...
 - **Pathway_targets_up_smallRNA_seed42.csv** — smallRNA → target mRNA → GO-BP 富集  
 - **Pathway_targets_down_smallRNA_seed42.csv** — 下调 smallRNAs target mRNA 富集  
 
----
-
 ###  `targets/` — miRNA → mRNA Target 映射
 
 - **Targets_up_from_smallRNA_seed42.txt** — 上调 smallRNAs 的 mRNA targets  
 - **Targets_down_from_smallRNA_seed42.txt** — 下调 smallRNAs 的 mRNA targets  
 
----
-
----
-
 ## 2. `RNA-seq/`
 用于处理 **GSE254877 RNA-seq** 数据。
-
----
 
 ###  `raw/` — 原始表达矩阵
 
@@ -276,16 +258,12 @@ MACHINE-LEARNING-WITH-...
 - 第一行描述行移除  
 - 第一列为 gene ID  
 
----
-
 ###  `clustering/` — RNA-seq 聚类结果
 
 **cluster_results_RNA_seed42.csv**  
 包含：  
 - `Sample_ID`  
 - `Cluster`  
-
----
 
 ###  `deg/` — mRNA 差异表达结果  
 由 `de_analysis_pipeline.py` 生成。
@@ -296,20 +274,12 @@ MACHINE-LEARNING-WITH-...
 - **DEG_top200_RNA_seed42.csv**  
 - **DEG_up_genes_RNA_seed42.txt** / **DEG_down_genes_RNA_seed42.txt**
 
----
-
 ###  `pathway/` — mRNA 的 GO-BP 富集
 
 - **Pathway_up_RNA_seed42.csv**  
 - **Pathway_down_RNA_seed42.csv**
 
----
-
----
-
 ## 3. `reference/` — SmallRNA Target 映射所需数据库
-
----
 
 ### **gene_attribute_edges.txt.gz**
 来自 miRTarBase / Enrichr 的原始边表：  
@@ -326,8 +296,6 @@ MACHINE-LEARNING-WITH-...
 | ... | ... |
 
 供 smallRNA target mapping 与 pathway enrichment 使用。
-
----
 
 ## Quick Usage Summary
 
