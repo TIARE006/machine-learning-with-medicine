@@ -1,6 +1,18 @@
 # RNA & smallRNA Analysis Pipeline: Clustering, Differential Expression, and Pathway Enrichment
 
-## Project Overview
+
+# Contents
+- [Project Overview](#project-overview)
+- [Installations](#installations)
+- [Full Pipeline Overview](#Full-Pipeline-Overview)
+- [Data Folder Overview](#data-folder-overview)
+- [Quick Start](#quick-start)
+- [Datasets](#datasets)
+- [Tasks \& Baselines](#tasks--baselines)
+- [References](#references)
+
+
+# Project Overview
 
 This project implements a complete analysis pipeline for two GEO datasets:
 
@@ -16,7 +28,75 @@ The pipeline performs four major steps:
 
 All intermediate and final outputs — clustering labels, DEG tables, gene lists, and pathway enrichment results — are saved under a structured `data/` directory.
 
+
+# Installation
+
+## 1. Clone the repository
+```bash
+git clone https://github.com/TIARE006/machine-learning-with-medicine
+cd machine-learning-with-medicine
+```
+
+## Step 2. Set up the environment:
+```bash
+# Set up the environment
+conda create -n mlomics python=3.14.0
+conda activate 
+```
+
+## Step 3. Install requirements:
+```bash
+pip install -r requirements.txt
+```
+
+## Step 4. Download datasets:
+```bash
+# Option 1: automatically download GEO datasets
+python scripts/download_data.py
+
+# Option 2: manually download from GEO
+# GSE254877: RNA-seq
+# GSE254878: small RNA-seq
+```
+
+
+# Full Pipeline Overview
+
+The script `run_full_pipeline.py` performs the complete multiomics workflow:
+
 ---
+
+## 1. Clustering (SNF)
+- Reads multi-omics matrices
+- Performs Similarity Network Fusion
+- Outputs cluster assignments
+
+## 2. Differential Expression Analysis (DEG)
+- Computes DEGs using multiple thresholds:
+  - Full list
+  - Strict threshold
+  - Relaxed threshold
+  - Top N genes
+- Outputs DEG tables for each comparison
+
+## 3. miRNA Target Mapping (smallRNA-seq only)
+- Maps differential miRNAs to target mRNAs
+- Generates up-/down-regulated target lists
+
+## 4. GO Biological Process Enrichment
+- GO-BP enrichment for:
+  - RNA-seq DEGs
+  - miRNA-derived target genes
+- Saves enriched pathway tables
+
+## 5. Final structured output
+All results are saved under `data/<DATA_TYPE>/integrated_results/`
+
+
+
+
+
+
 
 # Data Folder Overview
 
@@ -70,7 +150,45 @@ data/
     ├── gene_attribute_edges.txt.gz
     └── mirna_target_human.csv
 
-Folder-by-folder description
+```
+
+## Project Structure
+
+```
+MACHINE-LEARNING-WITH-...
+
+├── config/
+│   └── settings.yaml                 # 项目参数配置
+
+├── data/
+│   ├── integrated_results/           # 整合分析结果
+│   ├── lncRNA-seq/                   # lncRNA 数据
+│   ├── reference/                    # 参考数据库（miRNA/基因映射等）
+│   ├── RNA-seq/                      # RNA-seq 数据
+│   └── small RNA-seq/                # small RNA 数据
+│
+│   └── DOE_Cachexia Molecular Typing.md  # 说明文档（命名中含空格）
+
+├── R/
+│   └── run_deseq2_by_snf.R           # R 语言差异分析脚本
+
+├── scripts/
+│   ├── cluster_analysis_singleomics.py   # 单组学聚类分析
+│   └── run_full_pipeline.py              # 全流程分析脚本
+
+├── src/
+│   ├── __pycache__/                      # Python 缓存文件
+│   ├── __init__.py                       # 包初始化
+│   ├── methods_utils.py                  # 工具函数
+│   └── multiomics_snf_v2.py              # SNF 多组学算法实现
+
+└── README.md                              # 项目文档
+```
+
+
+
+## Folder-by-folder description
+
 1. small RNA-seq/
 raw/
 
@@ -252,17 +370,6 @@ map differential miRNAs to target mRNAs using reference/mirna_target_human.csv;
 
 run GO-BP enrichment on the target mRNA gene lists.
 
+---
 
-中文速记
 
-raw/：原始表达矩阵（GEO 下载后整理过的 counts）。
-
-clustering/：聚类结果（Sample_ID + Cluster），后面所有 DEG 都基于这个分组。
-
-deg/：差异分析结果（全表、严格阈值、宽松阈值、Top N、上下调列表）。
-
-pathway/：GO Biological Process 富集结果（直接基因，或者 smallRNA 映射后的靶基因）。
-
-targets/：smallRNA → mRNA 的靶基因列表（只对 small RNA-seq 有意义）。
-
-reference/：用来构建 smallRNA→靶点映射的参考数据库文件。
