@@ -1,0 +1,6 @@
+RNA-only Spectral Clustering (Graph-based)
+run: run_20251220-193231__3713d34e52
+samples: 85, features_used: 2000
+top_n=2000, knn_k=20, mu=0.5, candidate_K=(3, 4, 5), seed=42
+Best K = 4, silhouette(embedding) = 0.4849
+labels_csv: /home/tiare/Desktop/machine learning with medicine/results/clustering/RNA_only/run_20251220-193231__3713d34e52/labels/cluster_labels.csv

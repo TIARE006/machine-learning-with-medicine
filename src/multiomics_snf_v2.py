@@ -20,7 +20,10 @@ from collections import Counter
 
 import numpy as np
 import pandas as pd
-
+try:
+    from sklearn.manifold import spectral_embedding
+except Exception:
+    from sklearn.manifold._spectral_embedding import spectral_embedding
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans, SpectralClustering
@@ -133,51 +136,99 @@ def pca_transform(X: pd.DataFrame, n_components: int = 50) -> np.ndarray:
 
 
 # ============================================================
-# 4. SNF: affinity + fusion + clustering
+# 4. SNF: affinity + fusion + clustering（更规范版，最小改动）
 # ============================================================
-def construct_affinity_matrix(X: np.ndarray, K: int = 20, mu: float = 0.5) -> np.ndarray:
-    print("[SNF] Constructing affinity matrix...")
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+def _construct_S_and_P(
+    X: np.ndarray,
+    K: int = 20,
+    mu: float = 0.5,
+    metric: str = "euclidean",
+    standardize: bool = True,
+    eps: float = 1e-8
+):
+    """
+    返回:
+      S: 对称相似度矩阵 (n,n) —— 用于谱聚类更规范
+      P: 行随机矩阵 (n,n) —— 用于 SNF 扩散更规范
+    """
+    print("[SNF] Constructing affinity (S for clustering, P for diffusion)...")
 
-    dist = pairwise_distances(X_scaled, metric="euclidean")
-    N = dist.shape[0]
+    X_use = X
+    if standardize:
+        X_use = StandardScaler().fit_transform(X)
 
+    dist = pairwise_distances(X_use, metric=metric)
+    n = dist.shape[0]
+    if n <= 2:
+        raise ValueError("Need at least 3 samples to build an affinity graph.")
+    K_eff = int(min(K, n - 1))
+
+    # local scaling sigma_i
     dist_sort = np.sort(dist, axis=1)
-    K_eff = min(K, N - 1)
-    sigma = np.mean(dist_sort[:, 1:K_eff+1], axis=1) + 1e-8
-
+    sigma = np.mean(dist_sort[:, 1:K_eff + 1], axis=1) + eps
     sigma_i = sigma.reshape(-1, 1)
     sigma_j = sigma.reshape(1, -1)
-    W = np.exp(- (dist ** 2) / (sigma_i * sigma_j))
 
+    # Gaussian kernel with mu scaling (mu 越小越局部)
+    W = np.exp(-(dist ** 2) / (mu * sigma_i * sigma_j + eps))
+
+    # KNN sparsify based on distance
     W_knn = np.zeros_like(W)
-    for i in range(N):
-        idx = np.argsort(dist[i, :])[1:K_eff+1]
-        W_knn[i, idx] = W[i, idx]
+    for i in range(n):
+        nn_idx = np.argsort(dist[i, :])[1:K_eff + 1]
+        W_knn[i, nn_idx] = W[i, nn_idx]
 
-    W_sym = (W_knn + W_knn.T) / 2.0
+    # Symmetric similarity matrix S for spectral clustering
+    S = (W_knn + W_knn.T) / 2.0
+    np.fill_diagonal(S, 0.0)
 
-    row_sum = W_sym.sum(axis=1, keepdims=True)
+    # Row-stochastic transition matrix P for diffusion (SNF)
+    row_sum = S.sum(axis=1, keepdims=True)
     row_sum[row_sum == 0] = 1.0
-    W_norm = W_sym / row_sum
-    print("[SNF] Affinity matrix constructed.")
-    return W_norm
+    P = S / row_sum
+
+    print("[SNF] Affinity constructed.")
+    return S, P
+
+
+def construct_similarity_matrix(X: np.ndarray, K: int = 20, mu: float = 0.5) -> np.ndarray:
+    """谱聚类用：返回对称相似度 S"""
+    S, _ = _construct_S_and_P(X, K=K, mu=mu)
+    return S
+
+
+def construct_affinity_matrix(X: np.ndarray, K: int = 20, mu: float = 0.5) -> np.ndarray:
+    """
+    兼容旧接口：返回行随机矩阵 P（用于 SNF 扩散）。
+    注意：你原来返回的 W_norm 其实就是行归一化后的矩阵；这里更明确地把它定义为 P。
+    """
+    _, P = _construct_S_and_P(X, K=K, mu=mu)
+    return P
 
 
 def snf(affinity_list, K: int = 20, t: int = 20) -> np.ndarray:
+    """
+    输入: affinity_list = [P1, P2, ...] 行随机矩阵
+    输出: P_fused 行随机融合矩阵
+    """
     print(f"[SNF] Running SNF fusion with {len(affinity_list)} networks, "
           f"K={K}, t={t}...")
 
+    M = len(affinity_list)
+    if M < 2:
+        raise ValueError("SNF requires >=2 networks. For RNA-only, skip SNF and cluster on S_rna directly.")
+
     P_list = [W.copy() for W in affinity_list]
-    M = len(P_list)
     N = P_list[0].shape[0]
+    K_eff = int(min(K, N - 1))
 
     knn_masks = []
     for P in P_list:
         mask = np.zeros_like(P, dtype=bool)
         for i in range(N):
-            idx = np.argsort(P[i, :])[::-1][:K]
+            row = P[i, :].copy()
+            row[i] = -np.inf  # 排除 self
+            idx = np.argsort(row)[::-1][:K_eff]  # top-K similarity
             mask[i, idx] = True
         knn_masks.append(mask)
 
@@ -202,22 +253,33 @@ def snf(affinity_list, K: int = 20, t: int = 20) -> np.ndarray:
         if (it + 1) % 5 == 0:
             print(f"[SNF] Iteration {it+1}/{t} done")
 
-    W_fused = sum(P_list) / M
+    P_fused = sum(P_list) / M
+
+    # 数值安全：再归一化一次
+    row_sum = P_fused.sum(axis=1, keepdims=True)
+    row_sum[row_sum == 0] = 1.0
+    P_fused = P_fused / row_sum
+
     print("[SNF] Fusion finished.")
-    return W_fused
+    return P_fused
 
 
-def snf_clustering(W_fused: np.ndarray,
+def snf_clustering(S: np.ndarray,
                    candidate_K=(3, 4, 5),
                    random_state: int = RANDOM_STATE):
-    print("\n[SNF] Spectral clustering on fused network...")
+    """
+    输入：对称相似度矩阵 S（建议来自 construct_similarity_matrix 或 P_fused 对称化后）
+    聚类：sklearn SpectralClustering（保持你原行为）
+    选K：用谱嵌入空间 silhouette（比 1-W 更规范）
+    """
+    print("\n[Graph] Spectral clustering on similarity graph...")
     best_k = None
     best_score = -1.0
     best_labels = None
 
-    D = 1.0 - W_fused
-    D = (D + D.T) / 2.0
-    np.fill_diagonal(D, 0.0)
+    # ensure symmetric, zero diagonal
+    S_use = (S + S.T) / 2.0
+    np.fill_diagonal(S_use, 0.0)
 
     for k in candidate_K:
         sc = SpectralClustering(
@@ -226,20 +288,32 @@ def snf_clustering(W_fused: np.ndarray,
             random_state=random_state,
             assign_labels="kmeans"
         )
-        labels = sc.fit_predict(W_fused)
+        labels = sc.fit_predict(S_use)
 
         if len(set(labels)) <= 1:
             score = -1.0
         else:
-            score = silhouette_score(D, labels, metric="precomputed")
-        print(f"  [SNF] K={k}: silhouette_score={score:.4f}")
+            emb = spectral_embedding(
+                S_use,
+                n_components=int(k),
+                random_state=random_state,
+                eigen_solver="arpack"
+            )
+            # row-normalize embedding（常见实践，增强稳定性）
+            rown = np.linalg.norm(emb, axis=1, keepdims=True)
+            rown[rown == 0] = 1.0
+            emb = emb / rown
+
+            score = silhouette_score(emb, labels, metric="euclidean")
+
+        print(f"  [Graph] K={k}: silhouette(embedding)={score:.4f}")
 
         if score > best_score:
             best_k = k
             best_score = score
             best_labels = labels
 
-    print(f"[SNF] Best K = {best_k}, silhouette = {best_score:.4f}")
+    print(f"[Graph] Best K = {best_k}, silhouette = {best_score:.4f}")
     return best_labels, best_k, best_score
 
 
@@ -482,20 +556,31 @@ def run_snf_v2_pipeline():
     if common_samples is None:
         return
 
-    # 3) SNF
+    # 3) SNF（更规范：SNF 在 P 上融合；谱聚类在对称 S 上做）
     X_rna_aligned = X_rna.loc[common_samples]
     X_mir_aligned = X_mir.loc[common_samples]
 
     X_rna_var = select_top_variable_features(X_rna_aligned, top_n=2000)
     X_mir_var = select_top_variable_features(X_mir_aligned, top_n=500)
 
-    W_rna = construct_affinity_matrix(X_rna_var.values, K=20, mu=0.5)
-    W_mir = construct_affinity_matrix(X_mir_var.values, K=20, mu=0.5)
+    # 3.1 构图：S 用于谱聚类；P 用于 SNF 扩散
+    S_rna = construct_similarity_matrix(X_rna_var.values, K=20, mu=0.5)
+    P_rna = construct_affinity_matrix(X_rna_var.values, K=20, mu=0.5)
 
-    W_fused = snf([W_rna, W_mir], K=20, t=20)
+    S_mir = construct_similarity_matrix(X_mir_var.values, K=20, mu=0.5)
+    P_mir = construct_affinity_matrix(X_mir_var.values, K=20, mu=0.5)
+
+    # 3.2 SNF 融合（在 P 上融合）
+    P_fused = snf([P_rna, P_mir], K=20, t=20)
+
+    # 3.3 把 P_fused 对称化为 S_fused，再做谱聚类
+    S_fused = (P_fused + P_fused.T) / 2.0
+    S_fused[S_fused < 0] = 0.0
+    np.fill_diagonal(S_fused, 0.0)
+
 
     labels_snf, best_k_snf, score_snf = snf_clustering(
-        W_fused,
+        S_fused,
         candidate_K=(3, 4, 5),
         random_state=RANDOM_STATE
     )

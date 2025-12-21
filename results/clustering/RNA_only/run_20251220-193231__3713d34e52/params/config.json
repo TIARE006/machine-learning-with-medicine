@@ -1,0 +1,18 @@
+{
+  "method": "RNA_only_spectral",
+  "top_n": 2000,
+  "knn_k": 20,
+  "mu": 0.5,
+  "candidate_K": [
+    3,
+    4,
+    5
+  ],
+  "seed": 42,
+  "save_affinity": false,
+  "n_samples": 85,
+  "n_features_used": 2000,
+  "best_k": 4,
+  "best_silhouette_embedding": 0.4849038100812093,
+  "run_name": "run_20251220-193231__3713d34e52"
+}
