@@ -3,36 +3,83 @@ suppressPackageStartupMessages({
   library(DESeq2)
   library(readr)
   library(dplyr)
+  library(stringr)
   library(tibble)
 })
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
   cat("Usage:\n  Rscript R/rna_deseq2_one_vs_rest.R <RUN_DIR> <RNA_COUNTS_CSV>\n")
+  cat("Expected labels:\n  <RUN_DIR>/labels/cluster_labels.csv\n")
   quit(status = 1)
 }
 
-run_dir <- args[1]
+run_dir    <- args[1]
 counts_csv <- args[2]
 
 labels_csv <- file.path(run_dir, "labels", "cluster_labels.csv")
-out_dir <- file.path(run_dir, "degs_deseq2")
-plots_dir <- file.path(run_dir, "plots")
+out_dir    <- file.path(run_dir, "degs_deseq2")
+plots_dir  <- file.path(run_dir, "plots")
+
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(plots_dir, recursive = TRUE, showWarnings = FALSE)
 
-cat(">>> [DESeq2] run_dir:", run_dir, "\n")
-cat(">>> [DESeq2] labels:", labels_csv, "\n")
-cat(">>> [DESeq2] counts:", counts_csv, "\n")
+cat(">>> [DESeq2] run_dir :", run_dir, "\n")
+cat(">>> [DESeq2] labels  :", labels_csv, "\n")
+cat(">>> [DESeq2] counts  :", counts_csv, "\n")
+
+if (!file.exists(labels_csv)) stop("Missing labels file: ", labels_csv)
+if (!file.exists(counts_csv)) stop("Missing counts file: ", counts_csv)
 
 # -----------------------------
-# Load labels
+# Load labels (robust)
+# Support columns:
+#   Sample_ID/Cluster or sample/cluster or Sample_ID,cluster etc.
 # -----------------------------
-lab <- read_csv(labels_csv, show_col_types = FALSE) %>%
-  mutate(Sample_ID = as.character(Sample_ID))
+lab0 <- read_csv(labels_csv, show_col_types = FALSE)
+
+# normalize names
+cn <- colnames(lab0)
+cn_low <- tolower(cn)
+colnames(lab0) <- cn_low
+
+# rename sample column
+if (!("sample_id" %in% colnames(lab0))) {
+  s2 <- intersect(colnames(lab0), c("sample", "sampleid", "sample_id", "id"))
+  if (length(s2) == 0) stop("Labels must contain sample column (Sample_ID or sample). Got: ", paste(cn, collapse=","))
+  lab0 <- lab0 %>% rename(sample_id = all_of(s2[1]))
+}
+
+# rename cluster column
+if (!("cluster" %in% colnames(lab0))) {
+  c2 <- intersect(colnames(lab0), c("cluster", "label", "group"))
+  if (length(c2) == 0) stop("Labels must contain cluster column (Cluster or cluster). Got: ", paste(cn, collapse=","))
+  lab0 <- lab0 %>% rename(cluster = all_of(c2[1]))
+}
+
+lab <- lab0 %>%
+  transmute(
+    Sample_ID = as.character(sample_id),
+    Cluster   = as.character(cluster)
+  ) %>%
+  filter(!is.na(Sample_ID), Sample_ID != "", !is.na(Cluster), Cluster != "")
+
+# make sure cluster is integer-like if possible
+suppressWarnings({
+  lab$Cluster_int <- as.integer(lab$Cluster)
+})
+if (all(!is.na(lab$Cluster_int))) {
+  lab$Cluster <- as.integer(lab$Cluster)
+} else {
+  # keep as string if non-numeric labels exist
+  lab$Cluster <- as.character(lab$Cluster)
+}
+lab$Cluster_int <- NULL
+
+cat(">>> [DESeq2] labels loaded: n=", nrow(lab), "\n")
 
 # -----------------------------
-# Parse your special counts CSV
+# Parse counts CSV (your special format)
 # Line1: ",Unnamed: 1,<bam1>,<bam2>,..."
 # Line2: "FeatureID,type,AB_3,AB_4,..."
 # Data starts from line3
@@ -40,19 +87,19 @@ lab <- read_csv(labels_csv, show_col_types = FALSE) %>%
 first_line <- readLines(counts_csv, n = 1)
 parts <- strsplit(first_line, ",", fixed = TRUE)[[1]]
 
-# parts[1] is empty, parts[2] is "Unnamed: 1", rest are bam names
+# parts[1] empty, parts[2] "Unnamed: 1", rest are bam names
 bam_names <- parts[-c(1, 2)]
 bam_names <- trimws(bam_names)
 bam_names <- bam_names[bam_names != ""]
 
 cat(">>> [DESeq2] bam names from line1:", length(bam_names), "\n")
+if (length(bam_names) < 4) stop("Too few bam names parsed from first line; check counts CSV format.")
 
-# Read actual table from line2 onward
+# Read table from line2 onward
 df <- read_csv(counts_csv, skip = 1, show_col_types = FALSE)
 
-# Expect FeatureID + type + AB_* columns
 if (!all(c("FeatureID", "type") %in% colnames(df))) {
-  stop("Counts file format unexpected: missing FeatureID/type columns after skipping first line.")
+  stop("Counts file format unexpected after skipping first line: missing FeatureID/type columns.")
 }
 
 gene_ids <- df[["FeatureID"]]
@@ -61,14 +108,14 @@ counts_df <- df %>%
   select(-FeatureID, -type) %>%
   as.data.frame()
 
-# Drop obvious junk columns (in case)
+# Drop junk columns if present
 drop_cols <- grepl("^Unnamed", colnames(counts_df)) | grepl("^\\.\\.\\.[0-9]+$", colnames(counts_df))
 if (any(drop_cols)) {
-  cat(">>> [DESeq2] drop cols:", paste(colnames(counts_df)[drop_cols], collapse = ", "), "\n")
+  cat(">>> [DESeq2] dropping junk cols:", paste(colnames(counts_df)[drop_cols], collapse=", "), "\n")
   counts_df <- counts_df[, !drop_cols, drop = FALSE]
 }
 
-# Rename AB_* columns to bam names (must match)
+# Rename AB_* columns to bam names
 if (ncol(counts_df) != length(bam_names)) {
   cat(">>> [DESeq2] ERROR: ncol(counts_df)=", ncol(counts_df),
       " but bam_names=", length(bam_names), "\n")
@@ -76,10 +123,10 @@ if (ncol(counts_df) != length(bam_names)) {
 }
 colnames(counts_df) <- bam_names
 
-# Convert to numeric (invalid -> NA)
+# Convert to numeric
 counts_df[] <- lapply(counts_df, function(x) suppressWarnings(as.numeric(x)))
 
-# Handle NA
+# Handle NA -> 0
 na_total <- sum(is.na(as.matrix(counts_df)))
 if (na_total > 0) {
   cat(">>> [DESeq2] NA found in counts:", na_total, " -> set to 0\n")
@@ -87,12 +134,12 @@ if (na_total > 0) {
 }
 
 counts <- as.matrix(counts_df)
-rownames(counts) <- gene_ids
+rownames(counts) <- as.character(gene_ids)
 
-# Clean column names (trim)
+# Clean sample names
 colnames(counts) <- trimws(colnames(counts))
 
-# Remove fake samples like 'Unnamed:*' (extra safety)
+# Safety: remove any "Unnamed"
 bad <- grepl("^Unnamed", colnames(counts))
 if (any(bad)) counts <- counts[, !bad, drop = FALSE]
 
@@ -107,11 +154,24 @@ if (minv < 0) {
 # -----------------------------
 common <- intersect(lab$Sample_ID, colnames(counts))
 cat(">>> [DESeq2] common samples with labels:", length(common), "\n")
+
+missing_in_counts <- setdiff(lab$Sample_ID, colnames(counts))
+missing_in_labels <- setdiff(colnames(counts), lab$Sample_ID)
+
+if (length(missing_in_counts) > 0) {
+  cat(">>> [DESeq2] labels samples missing in counts (show up to 10):\n")
+  print(head(missing_in_counts, 10))
+}
+if (length(missing_in_labels) > 0) {
+  cat(">>> [DESeq2] counts samples missing in labels (show up to 10):\n")
+  print(head(missing_in_labels, 10))
+}
+
 if (length(common) < 4) stop("Too few matched samples between labels and counts.")
 
 lab2 <- lab %>% filter(Sample_ID %in% common)
 
-# reorder counts to label order
+# reorder counts to match labels
 counts2 <- counts[, lab2$Sample_ID, drop = FALSE]
 stopifnot(all(colnames(counts2) == lab2$Sample_ID))
 
@@ -139,15 +199,14 @@ dds_all <- DESeqDataSetFromMatrix(
                        cluster = factor(lab2$Cluster)),
   design = ~ cluster
 )
+
 dds_all <- estimateSizeFactors(dds_all)
 vsd <- vst(dds_all, blind = TRUE)
 vst_mat <- assay(vsd)
 
-write_csv(
-  as.data.frame(vst_mat) %>% rownames_to_column("gene"),
-  file.path(out_dir, "vst_matrix.csv")
-)
-cat(">>> [DESeq2] saved VST matrix:", file.path(out_dir, "vst_matrix.csv"), "\n")
+vst_out <- file.path(out_dir, "vst_matrix.csv")
+write_csv(as.data.frame(vst_mat) %>% rownames_to_column("gene"), vst_out)
+cat(">>> [DESeq2] saved VST matrix:", vst_out, "\n")
 
 # -----------------------------
 # one-vs-rest DESeq2 per cluster
@@ -163,18 +222,21 @@ for (c in clusters) {
   )
 
   dds <- DESeq(dds)
+
   res <- results(dds, contrast = c("group", paste0("C", c), "REST"))
-  res <- lfcShrink(dds,
-                   contrast = c("group", paste0("C", c), "REST"),
-                   res = res,
-                   type = "normal")
+  res <- lfcShrink(
+    dds,
+    contrast = c("group", paste0("C", c), "REST"),
+    res = res,
+    type = "normal"
+  )
 
   out <- as.data.frame(res) %>%
     rownames_to_column("gene") %>%
     filter(!is.na(padj)) %>%
     arrange(padj) %>%
     transmute(
-      gene = gene,
+      gene = as.character(gene),
       log2FC = log2FoldChange,
       p_value = pvalue,
       FDR = padj,
@@ -189,4 +251,3 @@ for (c in clusters) {
 }
 
 cat(">>> [DESeq2] done.\n")
-

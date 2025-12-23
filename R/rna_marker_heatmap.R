@@ -70,7 +70,6 @@ vst_mat <- vst_raw %>%
 vst_m <- vst_mat %>%
   select(-gene) %>%
   as.data.frame()
-
 rownames(vst_m) <- vst_mat$gene
 
 # ---------- collect top markers per cluster ----------
@@ -110,7 +109,6 @@ for (fp in deg_files) {
     filter(FDR <= fdr_cut, abs(log2FC) >= lfc_cut)
 
   message("    cluster ", k, ": significant genes = ", nrow(df_sig))
-
   if (nrow(df_sig) == 0) next
 
   top_genes <- df_sig %>%
@@ -153,6 +151,7 @@ zmat <- zscore_rows(vst_sub)
 
 # ---------- sample->cluster labels (optional but recommended) ----------
 anno_col <- NULL
+gaps_col <- NULL
 
 if (!is.na(labels_fp) && file.exists(labels_fp)) {
   lab <- suppressMessages(read_csv(labels_fp, show_col_types = FALSE))
@@ -176,19 +175,34 @@ if (!is.na(labels_fp) && file.exists(labels_fp)) {
   }
 
   lab <- lab %>%
-    mutate(sample = as.character(sample),
-           cluster = as.character(cluster)) %>%
+    mutate(
+      sample  = as.character(sample),
+      cluster = str_trim(as.character(cluster))
+    ) %>%
     filter(sample %in% colnames(zmat))
 
   if (nrow(lab) == 0) stop("No overlapping samples between labels and vst_matrix columns.")
 
-  # order columns by cluster then sample
-  lab <- lab %>% arrange(cluster, sample)
+  # ---- force 4 blocks: cluster order 0 -> 1 -> 2 -> 3 ----
+  lab <- lab %>%
+    mutate(cluster = factor(cluster, levels = c("0","1","2","3"))) %>%
+    arrange(cluster, sample)
+
+  # re-order columns by cluster blocks
   zmat <- zmat[, lab$sample, drop = FALSE]
 
-  anno_col <- data.frame(cluster = factor(lab$cluster))
+  # annotation
+  anno_col <- data.frame(cluster = lab$cluster)
   rownames(anno_col) <- lab$sample
+
+  # gaps between cluster blocks
+  cluster_sizes <- as.integer(table(lab$cluster))
+  gaps_col <- cumsum(cluster_sizes)
+  gaps_col <- gaps_col[-length(gaps_col)]
+
   message(">>> [Heatmap] using labels (n=", nrow(lab), "): ", labels_fp)
+  message(">>> [Heatmap] cluster sizes: ",
+          paste(names(table(lab$cluster)), as.integer(table(lab$cluster)), sep="=", collapse=" | "))
 } else {
   message(">>> [Heatmap] no labels file found; heatmap will not be cluster-annotated.")
 }
@@ -202,6 +216,8 @@ png(out_png, width = 2400, height = 1400, res = 220)
 pheatmap(
   zmat,
   annotation_col = anno_col,
+  cluster_cols = FALSE,     # keep your block order
+  gaps_col = gaps_col,      # draw 4 blocks
   show_colnames = FALSE,
   show_rownames = TRUE,
   fontsize_row = 7,
@@ -215,6 +231,8 @@ pdf(out_pdf, width = 11, height = 7)
 pheatmap(
   zmat,
   annotation_col = anno_col,
+  cluster_cols = FALSE,
+  gaps_col = gaps_col,
   show_colnames = FALSE,
   show_rownames = TRUE,
   fontsize_row = 7,
