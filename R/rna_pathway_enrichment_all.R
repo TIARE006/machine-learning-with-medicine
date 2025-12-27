@@ -15,6 +15,8 @@ cat("ARGS:\n"); print(args)
 if (length(args) < 1) {
   cat("Usage:\n")
   cat("  Rscript R/rna_pathway_enrichment_all.R <RUN_DIR> [FDR] [LFC] [TOPN]\n\n")
+  cat("Inputs (auto):\n")
+  cat("  <RUN_DIR>/degs_deseq2/DEG_cluster_<k>_vs_rest.csv\n\n")
   cat("Outputs (per cluster):\n")
   cat("  <RUN_DIR>/pathways/GO_BP_cluster_<k>.csv + _dotplot.png\n")
   cat("  <RUN_DIR>/pathways/GO_MF_cluster_<k>.csv + _dotplot.png\n")
@@ -33,9 +35,12 @@ fdr_cut <- ifelse(length(args) >= 2, as.numeric(args[2]), 0.05)
 lfc_cut <- ifelse(length(args) >= 3, as.numeric(args[3]), 1.0)
 topn    <- ifelse(length(args) >= 4, as.integer(args[4]), 15)
 
+# 目录按你的 run 结构
 degs_dir <- file.path(run_dir, "degs_deseq2")
 out_dir  <- file.path(run_dir, "pathways")
+plots_dir <- file.path(run_dir, "plots")  # 可选：如果你希望把 compare 图也放 plots，就改下面 ggsave 的路径
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(plots_dir, recursive = TRUE, showWarnings = FALSE)
 
 message(">>> [Enrich] run_dir: ", run_dir)
 message(">>> [Enrich] degs_dir: ", degs_dir)

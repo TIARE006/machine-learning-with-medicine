@@ -10,19 +10,48 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
   cat("Usage:\n  Rscript R/rna_deseq2_one_vs_rest.R <RUN_DIR> <RNA_COUNTS_CSV>\n")
-  cat("Expected labels:\n  <RUN_DIR>/labels/cluster_labels.csv\n")
+  cat("Expected labels (auto-detected):\n")
+  cat("  <RUN_DIR>/labels/cluster_labels.csv  (legacy)\n")
+  cat("  <RUN_DIR>/labels/cluster_results_*seed*.csv  (new)\n")
   quit(status = 1)
 }
 
 run_dir    <- args[1]
 counts_csv <- args[2]
 
-labels_csv <- file.path(run_dir, "labels", "cluster_labels.csv")
+labels_dir <- file.path(run_dir, "labels")
 out_dir    <- file.path(run_dir, "degs_deseq2")
 plots_dir  <- file.path(run_dir, "plots")
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(plots_dir, recursive = TRUE, showWarnings = FALSE)
+
+# -----------------------------
+# Resolve labels CSV:
+# Priority:
+# 1) labels/cluster_labels.csv (legacy)
+# 2) labels/cluster_results_*seed*.csv (new python output)
+# If multiple matches, pick the most recently modified file.
+# -----------------------------
+labels_csv_legacy <- file.path(labels_dir, "cluster_labels.csv")
+
+labels_csv <- NA_character_
+if (file.exists(labels_csv_legacy)) {
+  labels_csv <- labels_csv_legacy
+} else {
+  cand <- list.files(
+    labels_dir,
+    pattern = "^cluster_results_.*seed[0-9]+\\.csv$",
+    full.names = TRUE
+  )
+  if (length(cand) == 0) {
+    stop("Missing labels file. Expected either:\n  ",
+         labels_csv_legacy, "\n  or something like:\n  ",
+         file.path(labels_dir, "cluster_results_RNA_seed42.csv"))
+  }
+  cand_mtime <- file.info(cand)$mtime
+  labels_csv <- cand[order(cand_mtime, decreasing = TRUE)][1]
+}
 
 cat(">>> [DESeq2] run_dir :", run_dir, "\n")
 cat(">>> [DESeq2] labels  :", labels_csv, "\n")
