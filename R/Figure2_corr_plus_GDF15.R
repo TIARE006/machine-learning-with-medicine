@@ -19,7 +19,7 @@ seed_tag <- args[2]
 
 labels_csv <- file.path(run_dir, "labels", paste0("cluster_results_RNA_", seed_tag, ".csv"))
 vst_csv    <- file.path(run_dir, "degs_deseq2", "vst_matrix.csv")
-out_dir    <- file.path(run_dir, "plots")
+out_dir    <- file.path(run_dir, "plots", "2")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ----------------------------
@@ -31,10 +31,8 @@ labels_df <- read.csv(labels_csv, check.names = FALSE) %>%
 
 # ----------------------------
 # Load vst matrix (gene x samples) and convert to sample x gene
-# Assumption: first column named 'gene' (or similar); remaining columns are sample IDs
 # ----------------------------
 vst_raw <- read.csv(vst_csv, check.names = FALSE)
-gene_col <- colnames(vst_raw)[1]
 colnames(vst_raw)[1] <- "gene"
 
 expr_df <- vst_raw %>%
@@ -46,9 +44,7 @@ plot_df <- labels_df %>% inner_join(expr_df, by = "sample_id")
 # ----------------------------
 # Targets
 # ----------------------------
-# IMPORTANT: case-sensitive gene symbols as they appear in vst_matrix.csv
 genes_needed <- c("PIEZO1", "YAP1", "TEAD1", "GSDMD", "GDF15")
-
 missing_genes <- setdiff(genes_needed, colnames(plot_df))
 if (length(missing_genes) > 0) {
   stop(
@@ -71,9 +67,21 @@ pairs <- tibble::tribble(
 # Helpers
 # ----------------------------
 fmt_p <- function(p) {
-  if (is.na(p)) return("NA")
-  if (p < 1e-3) return(format(p, scientific = TRUE, digits = 2))
-  format(round(p, 4), nsmall = 4)
+  sapply(p, function(x) {
+    if (is.na(x)) return("NA")
+    if (x < 1e-3) return(format(x, scientific = TRUE, digits = 2))
+    format(round(x, 4), nsmall = 4)
+  })
+}
+
+sig_star <- function(p_adj) {
+  sapply(p_adj, function(x) {
+    if (is.na(x)) return("")
+    if (x < 0.001) return("***")
+    if (x < 0.01)  return("**")
+    if (x < 0.05)  return("*")
+    ""
+  })
 }
 
 corr_annot_text <- function(df, x, y) {
@@ -123,27 +131,97 @@ plot_scatter_by_cluster <- function(df, x, y) {
     theme(plot.title = element_text(face = "bold", hjust = 0.5))
 }
 
-# C) cluster-wise Spearman rho summary for all pairs
+# C) cluster-wise Spearman rho + p-value for all pairs
 clusterwise_spearman <- function(df, pairs_tbl) {
-  df %>%
-    tidyr::crossing(pairs_tbl) %>%
-    group_by(cluster, pair_name, x, y) %>%
-    summarise(
-      rho = {
-        xx <- .data[[x]]; yy <- .data[[y]]
-        ok <- is.finite(xx) & is.finite(yy)
-        if (sum(ok) < 3) NA_real_ else suppressWarnings(cor(xx[ok], yy[ok], method = "spearman"))
-      },
-      .groups = "drop"
+
+  clusters <- sort(unique(df$cluster))
+
+  res <- lapply(clusters, function(cl) {
+
+    df_cl <- df %>% filter(cluster == cl)
+
+    lapply(seq_len(nrow(pairs_tbl)), function(i) {
+
+      x <- pairs_tbl$x[i]
+      y <- pairs_tbl$y[i]
+
+      xx <- df_cl[[x]]
+      yy <- df_cl[[y]]
+      ok <- is.finite(xx) & is.finite(yy)
+
+      if (sum(ok) < 3) {
+        return(tibble(
+          cluster   = cl,
+          pair_name = pairs_tbl$pair_name[i],
+          rho       = NA_real_,
+          p_value   = NA_real_
+        ))
+      }
+
+      ct <- suppressWarnings(cor.test(xx[ok], yy[ok], method = "spearman"))
+
+      tibble(
+        cluster   = cl,
+        pair_name = pairs_tbl$pair_name[i],
+        rho       = unname(ct$estimate),
+        p_value   = ct$p.value
+      )
+    }) %>% bind_rows()
+  })
+
+  bind_rows(res)
+}
+
+# Heatmap (MAIN): rho + significance star (FDR)
+plot_corr_heatmap_main <- function(cw_df) {
+
+  cw_df <- cw_df %>%
+    mutate(
+      star  = sig_star(p_adj),
+      label = ifelse(is.na(rho), "NA", paste0("\u03c1=", round(rho, 2), star))
+    )
+
+  ggplot(cw_df, aes(x = pair_name, y = cluster, fill = rho)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = label), size = 6, lineheight = 0.95) +
+    labs(
+      title = "Cluster-specific Spearman correlations",
+      x = NULL,
+      y = "Cluster",
+      fill = "Spearman \u03c1"
+    ) +
+    theme_bw(base_size = 18) +
+    theme(
+      plot.title = element_text(face = "bold", hjust = 0.5),
+      axis.text.x = element_text(angle = 35, hjust = 1)
     )
 }
 
-plot_corr_heatmap <- function(cw_df) {
-  # y-axis as cluster, x-axis as pair
+# Heatmap (DETAIL): rho + p + FDR + n
+plot_corr_heatmap_detail <- function(cw_df) {
+
+  cw_df <- cw_df %>%
+    mutate(
+      label = dplyr::case_when(
+        is.na(rho) ~ paste0("NA\n(n=", n, ")"),
+        TRUE ~ paste0(
+          "\u03c1=", round(rho, 2), "\n",
+          "p=", fmt_p(p_value), "\n",
+          "FDR=", fmt_p(p_adj), "\n",
+          "(n=", n, ")"
+        )
+      )
+    )
+
   ggplot(cw_df, aes(x = pair_name, y = cluster, fill = rho)) +
     geom_tile(color = "white") +
-    geom_text(aes(label = ifelse(is.na(rho), "NA", round(rho, 3))), size = 6) +
-    labs(title = "Cluster-specific Spearman correlations", x = NULL, y = "Cluster", fill = "Spearman \u03c1") +
+    geom_text(aes(label = label), size = 4.6, lineheight = 0.95) +
+    labs(
+      title = "Cluster-specific Spearman correlations (detail)",
+      x = NULL,
+      y = "Cluster",
+      fill = "Spearman \u03c1"
+    ) +
     theme_bw(base_size = 18) +
     theme(
       plot.title = element_text(face = "bold", hjust = 0.5),
@@ -173,6 +251,7 @@ plot_box_jitter_kw <- function(df, gene) {
 # ----------------------------
 # Generate outputs
 # ----------------------------
+
 # 1) per-pair scatter plots (all + by cluster)
 for (i in seq_len(nrow(pairs))) {
   x <- pairs$x[i]; y <- pairs$y[i]; nm <- pairs$pair_name[i]
@@ -184,13 +263,37 @@ for (i in seq_len(nrow(pairs))) {
   ggsave(file.path(out_dir, paste0("Figure2_", nm, "_by_cluster.png")), p_by, width = 10, height = 8, dpi = 400)
 }
 
-# 2) heatmap summary (cluster-wise Spearman for all pairs)
+# 2) heatmap summary (cluster-wise Spearman for all pairs) + n + BH-FDR
 cw <- clusterwise_spearman(plot_df, pairs)
-p_heat <- plot_corr_heatmap(cw)
-ggsave(file.path(out_dir, "Figure2_clusterwise_corr_heatmap_5pairs.png"), p_heat, width = 12, height = 7, dpi = 400)
+
+# cluster sample sizes (n)
+cluster_n <- plot_df %>% count(cluster, name = "n")
+cw <- cw %>% left_join(cluster_n, by = "cluster")
+
+# BH-FDR correction (within each cluster across 5 pairs)
+cw <- cw %>%
+  group_by(cluster) %>%
+  mutate(p_adj = p.adjust(p_value, method = "BH")) %>%
+  ungroup()
+
+# Save table for inspection / supplement
+write.csv(cw, file.path(out_dir, "Figure2_clusterwise_corr_table_5pairs.csv"), row.names = FALSE)
+
+# MAIN (clean) + DETAIL (supp)
+p_main   <- plot_corr_heatmap_main(cw)
+p_detail <- plot_corr_heatmap_detail(cw)
+
+ggsave(file.path(out_dir, "Figure2_clusterwise_corr_heatmap_MAIN.png"),
+       p_main, width = 12, height = 7, dpi = 400)
+
+ggsave(file.path(out_dir, "Figure2_clusterwise_corr_heatmap_DETAIL.png"),
+       p_detail, width = 12, height = 7, dpi = 400)
 
 # 3) GDF15 boxplot
 p_gdf15 <- plot_box_jitter_kw(plot_df, "GDF15")
 ggsave(file.path(out_dir, "FigureX_GDF15_cluster_boxplot.png"), p_gdf15, width = 8, height = 7, dpi = 400)
 
 cat("Saved all figures to: ", out_dir, "\n")
+cat("Saved MAIN heatmap:  ", file.path(out_dir, "Figure2_clusterwise_corr_heatmap_MAIN.png"), "\n")
+cat("Saved DETAIL heatmap:", file.path(out_dir, "Figure2_clusterwise_corr_heatmap_DETAIL.png"), "\n")
+cat("Saved correlation table: ", file.path(out_dir, "Figure2_clusterwise_corr_table_5pairs.csv"), "\n")

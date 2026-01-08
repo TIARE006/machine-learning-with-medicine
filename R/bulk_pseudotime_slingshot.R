@@ -1,8 +1,6 @@
 # ============================================================
-# Bulk pseudotime analysis using Slingshot (NO re-clustering)
-# Input:
-#   - vst_matrix.csv
-#   - cluster_results_RNA_seed42.csv
+# Bulk pseudotime analysis using DiffusionMap + Slingshot
+# (NO re-clustering)
 # ============================================================
 
 suppressPackageStartupMessages({
@@ -10,7 +8,9 @@ suppressPackageStartupMessages({
   library(matrixStats)
   library(ggplot2)
   library(slingshot)
+  library(destiny)
   library(RColorBrewer)
+  library(patchwork)
 })
 
 # ============================================================
@@ -18,7 +18,7 @@ suppressPackageStartupMessages({
 # ============================================================
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
-  stop("Usage: Rscript bulk_pseudotime_slingshot.R <RUN_DIR>")
+  stop("Usage: Rscript bulk_pseudotime_slingshot_DM.R <RUN_DIR>")
 }
 
 run_dir <- args[1]
@@ -28,12 +28,10 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 vst_path <- file.path(run_dir, "degs_deseq2", "vst_matrix.csv")
 clu_path <- file.path(run_dir, "labels", "cluster_results_RNA_seed42.csv")
 
-cat("Using vst:", vst_path, "\n")
-cat("Using labels:", clu_path, "\n")
 stopifnot(file.exists(vst_path), file.exists(clu_path))
 
 # ============================================================
-# 2. Read VST matrix robustly
+# 2. Read VST matrix
 # ============================================================
 read_vst <- function(path){
   df <- read.csv(path, check.names = FALSE)
@@ -48,7 +46,7 @@ read_vst <- function(path){
 
 vst <- read_vst(vst_path)
 
-# If matrix is genes x samples → transpose
+# genes x samples → transpose
 if (nrow(vst) > 1000 && ncol(vst) < 500) {
   vst <- t(vst)
 }
@@ -79,7 +77,7 @@ clu2 <- clu %>%
   arrange(match(sample, common))
 
 # ============================================================
-# 5. Select variable genes (bulk pseudotime stability)
+# 5. Select variable genes
 # ============================================================
 gene_var <- matrixStats::colVars(vst2)
 topN <- min(2000, length(gene_var))
@@ -88,80 +86,116 @@ top_genes <- names(sort(gene_var, decreasing = TRUE))[1:topN]
 X <- scale(vst2[, top_genes, drop = FALSE])
 
 # ============================================================
-# 6. PCA
+# 6. Diffusion Map (KEY CHANGE)
 # ============================================================
-pca <- prcomp(X, center = FALSE, scale. = FALSE)
+dm <- DiffusionMap(X, n_eigs = 5)
 
-pcs <- as.data.frame(pca$x[, 1:5])
-pcs$sample <- rownames(pcs)
+emb <- eigenvectors(dm)[, 1:5]
+colnames(emb) <- paste0("DC", 1:5)
+
+pcs <- as.data.frame(emb)
+pcs$sample <- rownames(emb)
 pcs <- pcs %>% left_join(clu2, by = "sample")
 
 # ============================================================
-# 7. Slingshot (NO reclustering)
+# 7. Slingshot (MULTI-LINEAGE)
 # ============================================================
-ROOT_CLUSTER <- "0"   # early state (can change to 1/2/3)
+ROOT_CLUSTER <- "0"
+END_CLUSTERS <- c("1", "2")
 
 sce <- slingshot(
-  pca$x[, 1:5],
+  emb,
   clusterLabels = pcs$cluster,
-  start.clus = ROOT_CLUSTER
+  start.clus = ROOT_CLUSTER,
+  end.clus   = END_CLUSTERS
 )
 
-pt <- slingPseudotime(sce)[, 1]
+pt_mat <- slingPseudotime(sce)
+
+pt <- apply(pt_mat, 1, function(x) {
+  if (all(is.na(x))) NA else max(x, na.rm = TRUE)
+})
+
 pt <- (pt - min(pt, na.rm = TRUE)) /
       (max(pt, na.rm = TRUE) - min(pt, na.rm = TRUE))
 
 pcs$pseudotime <- pt
 
-write.csv(
-  pcs %>% select(sample, cluster, pseudotime),
-  file = file.path(out_dir, "bulk_pseudotime_table.csv"),
-  row.names = FALSE
+# ============================================================
+# 8. Composite figure (distribution + branching)
+# ============================================================
+
+# Left: distribution
+p_left <- ggplot(pcs, aes(DC1, DC2)) +
+  geom_point(aes(color = cluster), size = 2.3, alpha = 0.85) +
+  theme_bw(base_size = 14) +
+  labs(
+    title = "Protein-coding genes (bulk)",
+    x = "Component 1",
+    y = "Component 2",
+    color = "Cluster"
+  )
+
+# Right: branching trajectory
+curve_list <- slingCurves(sce)
+
+curve_df <- purrr::map_dfr(
+  seq_along(curve_list),
+  function(i) {
+    crv <- curve_list[[i]]
+    df <- as.data.frame(crv$s[, 1:2])
+    colnames(df) <- c("DC1", "DC2")
+    df$pseudotime <- crv$lambda
+    df <- df[order(df$pseudotime), ]
+
+    tibble(
+      DC1 = smooth.spline(df$pseudotime, df$DC1, spar = 0.7)$y,
+      DC2 = smooth.spline(df$pseudotime, df$DC2, spar = 0.7)$y,
+      lineage = paste0("Lineage_", i)
+    )
+  }
 )
 
-# ============================================================
-# 8. Plot 1 (CLEAN): PCA + single principal trajectory
-# ============================================================
-
-# Extract first lineage principal curve
-curve_df <- as.data.frame(slingCurves(sce)[[1]]$s[, 1:2])
-colnames(curve_df) <- c("PC1", "PC2")
-
-p1 <- ggplot(pcs, aes(PC1, PC2, color = cluster)) +
-  geom_point(size = 2, alpha = 0.85) +
+p_right <- ggplot(pcs, aes(DC1, DC2)) +
+  geom_point(aes(color = cluster), size = 2.3, alpha = 0.85) +
   geom_path(
     data = curve_df,
-    aes(PC1, PC2),
+    aes(DC1, DC2, group = lineage),
     inherit.aes = FALSE,
-    linewidth = 1.2,
+    linewidth = 1.6,
     color = "black"
   ) +
   theme_bw(base_size = 14) +
   labs(
-    title = "Bulk pseudotime trajectory (Slingshot)",
-    color = "Cluster"
-  )
+    title = "Bulk pseudotime trajectory with branching",
+    x = "Component 1",
+    y = "Component 2"
+  ) +
+  theme(legend.position = "none")
+
+p_final <- p_left + p_right + plot_layout(ncol = 2)
 
 ggsave(
-  file.path(out_dir, "Pseudotime_PCA_slingshot.png"),
-  p1, width = 8, height = 6, dpi = 300
+  file.path(out_dir, "Figure_bulk_pseudotime_DM_composite.png"),
+  p_final,
+  width = 13,
+  height = 6,
+  dpi = 300
 )
 
 # ============================================================
-# 9. Plot 2: pseudotime by cluster
+# 9. Pseudotime by cluster
 # ============================================================
 p2 <- ggplot(pcs, aes(cluster, pseudotime)) +
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(width = 0.15, alpha = 0.7, size = 1.8) +
-  theme_bw(base_size = 14) +
-  labs(title = "Pseudotime distribution by cluster",
-       y = "Pseudotime (0–1)")
+  theme_bw(base_size = 14)
 
 ggsave(file.path(out_dir, "Pseudotime_by_cluster.png"),
        p2, width = 7, height = 5, dpi = 300)
 
 # ============================================================
-# 10. Plot 3: Gene expression vs pseudotime
+# 10. Gene expression vs pseudotime
 # ============================================================
 genes_to_plot <- c("PIEZO1", "YAP1", "TEAD1", "GSDMD", "GDF15")
 
@@ -174,13 +208,9 @@ expr_long <- vst2 %>%
 
 p3 <- ggplot(expr_long, aes(pseudotime, expr, color = cluster)) +
   geom_point(alpha = 0.7, size = 1.6) +
-  geom_smooth(se = FALSE, method = "gam",
-              formula = y ~ s(x, k = 5)) +
+  geom_smooth(se = FALSE, method = "gam", formula = y ~ s(x, k = 5)) +
   facet_wrap(~gene, scales = "free_y") +
-  theme_bw(base_size = 13) +
-  labs(title = "Gene expression dynamics along bulk pseudotime",
-       x = "Pseudotime (0–1)",
-       y = "Expression (VST)")
+  theme_bw(base_size = 13)
 
 ggsave(file.path(out_dir, "Genes_vs_pseudotime.png"),
        p3, width = 11, height = 7, dpi = 300)
