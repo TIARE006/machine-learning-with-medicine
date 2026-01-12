@@ -1,0 +1,4 @@
+module,spearman_rho,pvalue,padj
+Metabolism,0.19999999999999998,0.8,0.8
+Inflammation,0.7999999999999999,0.20000000000000007,0.3000000000000001
+ECM_Mechanical,1.0,0.0,0.0

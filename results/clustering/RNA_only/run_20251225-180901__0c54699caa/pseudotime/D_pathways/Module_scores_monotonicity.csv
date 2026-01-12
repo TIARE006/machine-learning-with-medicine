@@ -1,0 +1,7 @@
+"pathway","spearman_rho","pvalue","padj"
+"ECM_EMT",0.4,0.75,0.9
+"GLYCOLYSIS",-0.4,0.75,0.9
+"JAK_STAT",0.8,0.333333333333333,0.9
+"TGF_BETA",0.4,0.75,0.9
+"TNFA_NFKB",0.8,0.333333333333333,0.9
+"FA_METAB",0,1,1
