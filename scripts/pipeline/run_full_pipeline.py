@@ -158,7 +158,7 @@ def main():
     )
 
     # ---------- 2.6 三层 ceRNA：lncRNA–miRNA–mRNA ----------
-    integrated_dir = os.path.join(BASE_DIR, "data", "integrated_results")
+    integrated_dir = os.path.join(BASE_DIR, "results", "integrated")
     triplet_dir = os.path.join(integrated_dir, "triplets")
     mirna_rna_trip_file = os.path.join(
         triplet_dir, f"miRNA_target_RNA_triplets_seed{RANDOM_STATE}.csv"
@@ -297,7 +297,7 @@ if __name__ == "__main__":
 #     )
 
 #     # ---------- 2.6 三层 ceRNA：lncRNA–miRNA–mRNA ----------
-#     integrated_dir = os.path.join(BASE_DIR, "data", "integrated_results")
+#     integrated_dir = os.path.join(BASE_DIR, "results", "integrated")
 #     triplet_dir = os.path.join(integrated_dir, "triplets")
 #     mirna_rna_trip_file = os.path.join(
 #         triplet_dir, f"miRNA_target_RNA_triplets_seed{RANDOM_STATE}.csv"

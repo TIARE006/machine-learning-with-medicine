@@ -9,7 +9,7 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
-  cat("Usage:\n  Rscript R/rna_deseq2_one_vs_rest.R <RUN_DIR> <RNA_COUNTS_CSV>\n")
+  cat("Usage:\n  Rscript R/differential_expression/rna_deseq2_one_vs_rest.R <RUN_DIR> <RNA_COUNTS_CSV>\n")
   cat("Expected labels (auto-detected):\n")
   cat("  <RUN_DIR>/labels/cluster_labels.csv  (legacy)\n")
   cat("  <RUN_DIR>/labels/cluster_results_*seed*.csv  (new)\n")

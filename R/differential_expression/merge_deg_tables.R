@@ -7,7 +7,7 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
-  cat("Usage:\n  Rscript R/merge_deg_tables.R <RUN_DIR> [OUT_NAME]\n\n")
+  cat("Usage:\n  Rscript R/differential_expression/merge_deg_tables.R <RUN_DIR> [OUT_NAME]\n\n")
   cat("Reads:\n  <RUN_DIR>/degs_deseq2/DEG_cluster_*_vs_rest.csv\n")
   cat("Writes:\n  <RUN_DIR>/degs_deseq2/<OUT_NAME>.csv (Excel-readable)\n")
   cat("  <RUN_DIR>/degs_deseq2/<OUT_NAME>.xlsx (if openxlsx available)\n")

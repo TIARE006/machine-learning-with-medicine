@@ -1,4 +1,4 @@
-# scripts/rna_make_plots.py
+# scripts/plotting/rna_make_plots.py
 # -*- coding: utf-8 -*-
 
 import os

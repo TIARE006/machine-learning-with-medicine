@@ -68,12 +68,12 @@ def load_expression_only(data_type: str) -> pd.DataFrame:
     """
     if data_type == "RNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "RNA-seq", "raw",
+            BASE_DIR, "data", "raw", "RNA_seq", 
             "GSE254877_raw_counts_expression.csv"
         )
     elif data_type == "smallRNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "small RNA-seq", "raw",
+            BASE_DIR, "data", "raw", "small_RNA_seq", 
             "GSE254878_smallRNAs_raw_counts_expression.csv"
         )
     else:
@@ -460,8 +460,8 @@ def run_rna_deg_from_earlyfusion(X_rna_aligned: pd.DataFrame,
     for c in unique_clusters:
         print(f"  - Cluster {c}: n = {counts[c]}")
 
-    base_deg_dir = os.path.join(BASE_DIR, "data", "RNA-seq", "deg_EarlyFusion")
-    base_path_dir = os.path.join(BASE_DIR, "data", "RNA-seq", "pathway_EarlyFusion")
+    base_deg_dir = os.path.join(BASE_DIR, "data", "raw", "RNA_seq", "deg_EarlyFusion")
+    base_path_dir = os.path.join(BASE_DIR, "data", "raw", "RNA_seq", "pathway_EarlyFusion")
     os.makedirs(base_deg_dir, exist_ok=True)
     os.makedirs(base_path_dir, exist_ok=True)
 
@@ -586,7 +586,7 @@ def run_snf_v2_pipeline():
     )
 
     # 4) 保存聚类结果
-    out_dir = os.path.join(BASE_DIR, "data", "integrated_results")
+    out_dir = os.path.join(BASE_DIR, "results", "integrated")
     os.makedirs(out_dir, exist_ok=True)
 
     snf_out_file = os.path.join(

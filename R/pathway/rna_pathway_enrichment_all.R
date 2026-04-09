@@ -14,7 +14,7 @@ cat("ARGS:\n"); print(args)
 
 if (length(args) < 1) {
   cat("Usage:\n")
-  cat("  Rscript R/rna_pathway_enrichment_all.R <RUN_DIR> [FDR] [LFC] [TOPN]\n\n")
+  cat("  Rscript R/pathway/rna_pathway_enrichment_all.R <RUN_DIR> [FDR] [LFC] [TOPN]\n\n")
   cat("Inputs (auto):\n")
   cat("  <RUN_DIR>/degs_deseq2/DEG_cluster_<k>_vs_rest.csv\n\n")
   cat("Outputs (per cluster):\n")

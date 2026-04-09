@@ -8,7 +8,7 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
-  stop("Usage: Rscript R/module_score_pseudotime_pathways.R <RUN_DIR>")
+  stop("Usage: Rscript R/pathway/module_score_pseudotime_pathways.R <RUN_DIR>")
 }
 run_dir <- args[1]
 

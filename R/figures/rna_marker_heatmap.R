@@ -11,7 +11,7 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
   cat("Usage:\n")
-  cat("  Rscript R/rna_marker_heatmap.R <RUN_DIR> [TOPN] [FDR] [LFC]\n\n")
+  cat("  Rscript R/figures/rna_marker_heatmap.R <RUN_DIR> [TOPN] [FDR] [LFC]\n\n")
   cat("Inputs expected:\n")
   cat("  <RUN_DIR>/degs_deseq2/vst_matrix.csv\n")
   cat("  <RUN_DIR>/degs_deseq2/DEG_cluster_*_vs_rest.csv\n")

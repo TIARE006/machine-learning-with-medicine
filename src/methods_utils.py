@@ -77,37 +77,37 @@ def load_expression_and_clusters(data_type: str, seed: int):
     """
     if data_type == "smallRNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "small RNA-seq", "raw",
+            BASE_DIR, "data", "raw", "small_RNA_seq", 
             "GSE254878_smallRNAs_raw_counts_expression.csv"
         )
         cluster_file = os.path.join(
-            BASE_DIR, "data", "small RNA-seq", "clustering",
+            BASE_DIR, "data", "raw", "small_RNA_seq", "clustering",
             f"cluster_results_smallRNA_seed{seed}.csv"
         )
-        base_out = os.path.join(BASE_DIR, "data", "small RNA-seq")
+        base_out = os.path.join(BASE_DIR, "data", "raw", "small_RNA_seq")
 
     elif data_type == "RNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "RNA-seq", "raw",
+            BASE_DIR, "data", "raw", "RNA_seq", 
             "GSE254877_raw_counts_expression.csv"
         )
         cluster_file = os.path.join(
-            BASE_DIR, "data", "RNA-seq", "clustering",
+            BASE_DIR, "data", "raw", "RNA_seq", "clustering",
             f"cluster_results_RNA_seed{seed}.csv"
         )
-        base_out = os.path.join(BASE_DIR, "data", "RNA-seq")
+        base_out = os.path.join(BASE_DIR, "data", "raw", "RNA_seq")
 
     elif data_type == "lncRNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "lncRNA-seq", "raw",
+            BASE_DIR, "data", "raw", "lncRNA_seq", 
             "GSE254877_lncRNA_raw_counts_expression.csv"
         )
         # lncRNA 用的是 RNA 的聚类标签（同一批样本）
         cluster_file = os.path.join(
-            BASE_DIR, "data", "RNA-seq", "clustering",
+            BASE_DIR, "data", "raw", "RNA_seq", "clustering",
             f"cluster_results_RNA_seed{seed}.csv"
         )
-        base_out = os.path.join(BASE_DIR, "data", "lncRNA-seq")
+        base_out = os.path.join(BASE_DIR, "data", "raw", "lncRNA_seq")
 
     else:
         raise ValueError("data_type 必须是 'smallRNA'、'RNA' 或 'lncRNA'")
@@ -172,24 +172,24 @@ def load_expression_and_snf_clusters(data_type: str,
     # ---------- 1) 各组学表达矩阵路径 ----------
     if data_type == "smallRNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "small RNA-seq", "raw",
+            BASE_DIR, "data", "raw", "small_RNA_seq", 
             "GSE254878_smallRNAs_raw_counts_expression.csv"
         )
-        base_out = os.path.join(BASE_DIR, "data", "small RNA-seq")
+        base_out = os.path.join(BASE_DIR, "data", "raw", "small_RNA_seq")
 
     elif data_type == "RNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "RNA-seq", "raw",
+            BASE_DIR, "data", "raw", "RNA_seq", 
             "GSE254877_raw_counts_expression.csv"
         )
-        base_out = os.path.join(BASE_DIR, "data", "RNA-seq")
+        base_out = os.path.join(BASE_DIR, "data", "raw", "RNA_seq")
 
     elif data_type == "lncRNA":
         expr_file = os.path.join(
-            BASE_DIR, "data", "lncRNA-seq", "raw",
+            BASE_DIR, "data", "raw", "lncRNA_seq", 
             "GSE254877_lncRNA_raw_counts_expression.csv"
         )
-        base_out = os.path.join(BASE_DIR, "data", "lncRNA-seq")
+        base_out = os.path.join(BASE_DIR, "data", "raw", "lncRNA_seq")
 
     else:
         raise ValueError("data_type 必须是 'smallRNA'、'RNA' 或 'lncRNA'")
@@ -479,7 +479,7 @@ def build_smallrna_rna_overlap(rna_up, rna_down,
         - overlap/overlap_targetsUp_RNAup_seedXX.txt / ...
         - triplets/miRNA_target_RNA_triplets_seedXX.csv
     """
-    integrated_dir = os.path.join(BASE_DIR, "data", "integrated_results")
+    integrated_dir = os.path.join(BASE_DIR, "results", "integrated")
     overlap_dir    = os.path.join(integrated_dir, "overlap")
     triplet_dir    = os.path.join(integrated_dir, "triplets")
     os.makedirs(overlap_dir, exist_ok=True)
@@ -603,7 +603,7 @@ def build_ceRNA3_triplets(lnc_up, lnc_down,
       - lncRNA–miRNA 映射 (lncrna_mirna_db)
       - miRNA–mRNA triplets (miRNA_target_RNA_triplets_seedXX.csv)
     """
-    integrated_dir = os.path.join(BASE_DIR, "data", "integrated_results")
+    integrated_dir = os.path.join(BASE_DIR, "results", "integrated")
     cerna_dir = os.path.join(integrated_dir, "ceRNA3")
     triplet_dir = os.path.join(cerna_dir, "triplets")
     enrich_dir = os.path.join(cerna_dir, "enrichment")
@@ -730,7 +730,7 @@ def postprocess_mirna_mrna_triplets(seed: int = RANDOM_STATE):
         data/integrated_results/enrichment/GO_miRup_RNAdown_targets_GO_BP_seedXX.csv
         data/integrated_results/enrichment/GO_miRdown_RNAup_targets_GO_BP_seedXX.csv
     """
-    integrated_dir = os.path.join(BASE_DIR, "data", "integrated_results")
+    integrated_dir = os.path.join(BASE_DIR, "results", "integrated")
     triplet_dir = os.path.join(integrated_dir, "triplets")
     enrich_dir = os.path.join(integrated_dir, "enrichment")
     os.makedirs(triplet_dir, exist_ok=True)
@@ -882,17 +882,17 @@ def load_deg_full_from_deseq2(data_type: str, seed: int, base_dir: str = BASE_DI
     """
     if data_type == "RNA_SNF":
         path = os.path.join(
-            base_dir, "data", "RNA-seq", "deg_SNF",
+            base_dir, "data", "raw", "RNA_seq", "deg_SNF",
             f"DEG_full_RNA_SNF_seed{seed}.csv"
         )
     elif data_type == "smallRNA_SNF":
         path = os.path.join(
-            base_dir, "data", "small RNA-seq", "deg_SNF",
+            base_dir, "data", "raw", "small_RNA_seq", "deg_SNF",
             f"DEG_full_smallRNA_SNF_seed{seed}.csv"
         )
     elif data_type == "lncRNA_SNF":
         path = os.path.join(
-            base_dir, "data", "lncRNA-seq", "deg_SNF",
+            base_dir, "data", "raw", "lncRNA_seq", "deg_SNF",
             f"DEG_full_lncRNA_SNF_seed{seed}.csv"
         )
     else:
@@ -915,9 +915,9 @@ def run_r_deseq2_by_snf():
     调用 Rscript 运行 run_deseq2_by_snf.R
     - 前提：R 安装好了，命令行能直接用 `Rscript`
     - 脚本会生成：
-        data/RNA-seq/deg_SNF/DEG_full_RNA_SNF_seed42.csv
-        data/small RNA-seq/deg_SNF/DEG_full_smallRNA_SNF_seed42.csv
-        data/lncRNA-seq/deg_SNF/DEG_full_lncRNA_SNF_seed42.csv
+        results/integrated/deg_SNF/RNA_seq/DEG_full_RNA_SNF_seed42.csv
+        results/integrated/deg_SNF/small_RNA_seq/DEG_full_smallRNA_SNF_seed42.csv
+        results/integrated/deg_SNF/lncRNA_seq/DEG_full_lncRNA_SNF_seed42.csv
     """
     print("\n===== [STEP 1.5] Run R-based DESeq2 DEG by SNF clusters =====")
     if not os.path.exists(R_DESEQ2_SCRIPT):

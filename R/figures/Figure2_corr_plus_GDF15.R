@@ -9,8 +9,8 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
-  cat("Usage:\n  Rscript R/Figure2_corr_plus_GDF15.R <RUN_DIR> <SEED_TAG>\n\n")
-  cat("Example:\n  Rscript R/Figure2_corr_plus_GDF15.R results/clustering/RNA_only/run_20251225-180901__0c54699caa seed42\n")
+  cat("Usage:\n  Rscript R/figures/Figure2_corr_plus_GDF15.R <RUN_DIR> <SEED_TAG>\n\n")
+  cat("Example:\n  Rscript R/figures/Figure2_corr_plus_GDF15.R results/clustering/RNA_only/run_20251225-180901__0c54699caa seed42\n")
   quit(status = 1)
 }
 

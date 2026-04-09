@@ -232,16 +232,16 @@ def main():
         expr_file = os.path.join(
             BASE_DIR,
             "data",
-            "small RNA-seq",
-            "raw",
+            "raw", "small_RNA_seq",
+            
             "GSE254878_smallRNAs_raw_counts_expression.csv",
         )
     elif DATA_TYPE == "RNA":
         expr_file = os.path.join(
             BASE_DIR,
             "data",
-            "RNA-seq",
-            "raw",
+            "raw", "RNA_seq",
+            
             "GSE254877_raw_counts_expression.csv",
         )
     else:

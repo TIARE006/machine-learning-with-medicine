@@ -12,7 +12,7 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) {
   cat("Usage:\n")
-  cat("  Rscript R/cluster_phenotype_figure1_plus.R <RUN_DIR> [SEED_TAG]\n\n")
+  cat("  Rscript R/figures/cluster_phenotype_figure1_plus.R <RUN_DIR> [SEED_TAG]\n\n")
   cat("Reads:\n")
   cat("  <RUN_DIR>/labels/cluster_results_RNA_<SEED_TAG>.csv\n")
   cat("  <RUN_DIR>/degs_deseq2/vst_matrix.csv\n\n")
@@ -20,7 +20,7 @@ if (length(args) < 1) {
   cat("  <RUN_DIR>/plots/Figure1plus_cluster_level_phenotype.png\n")
   cat("  <RUN_DIR>/plots/Figure1plus_cluster_level_phenotype.pdf\n\n")
   cat("Example:\n")
-  cat("  Rscript R/cluster_phenotype_figure1_plus.R results/clustering/RNA_only/run_20251225-180901__0c54699caa seed42\n")
+  cat("  Rscript R/figures/cluster_phenotype_figure1_plus.R results/clustering/RNA_only/run_20251225-180901__0c54699caa seed42\n")
   quit(status = 1)
 }
 

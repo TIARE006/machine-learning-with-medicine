@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# 当前文件: scripts/rna_spectral_pipeline.py
+# 当前文件: scripts/pipeline/rna_spectral_pipeline.py
 # 项目根目录: machine learning with medicine/
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:

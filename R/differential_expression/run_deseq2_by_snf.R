@@ -57,22 +57,22 @@ run_deseq2_for_omics <- function(
 
   if (data_type == "RNA") {
     expr_file <- file.path(
-      base_dir, "data", "RNA-seq", "raw",
+      base_dir, "data", "raw", "RNA_seq", 
       "GSE254877_raw_counts_expression.csv"
     )
-    deg_dir <- file.path(base_dir, "data", "RNA-seq", "deg_SNF")
+    deg_dir <- file.path(base_dir, "data", "raw", "RNA_seq", "deg_SNF")
   } else if (data_type == "smallRNA") {
     expr_file <- file.path(
-      base_dir, "data", "small RNA-seq", "raw",
+      base_dir, "data", "raw", "small_RNA_seq", 
       "GSE254878_smallRNAs_raw_counts_expression.csv"
     )
-    deg_dir <- file.path(base_dir, "data", "small RNA-seq", "deg_SNF")
+    deg_dir <- file.path(base_dir, "data", "raw", "small_RNA_seq", "deg_SNF")
   } else if (data_type == "lncRNA") {
     expr_file <- file.path(
-      base_dir, "data", "lncRNA-seq", "raw",
+      base_dir, "data", "raw", "lncRNA_seq", 
       "GSE254877_lncRNA_raw_counts_expression.csv"
     )
-    deg_dir <- file.path(base_dir, "data", "lncRNA-seq", "deg_SNF")
+    deg_dir <- file.path(base_dir, "data", "raw", "lncRNA_seq", "deg_SNF")
   }
 
   if (!dir.exists(deg_dir)) dir.create(deg_dir, recursive = TRUE)
