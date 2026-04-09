@@ -1,0 +1,39 @@
+dataset: GSE254877
+
+expression_file: data/raw/RNA_seq/GSE254877_counts_matrix_for_cps.csv
+pheno_file: data/raw/RNA_seq/GSE254877_pheno_ab_for_cps.csv
+
+sample_id_column: sample_id
+group_column: subgroup
+
+gene_column_candidates:
+  - FeatureID
+  - featureid
+  - gene
+  - Gene
+  - symbol
+  - Symbol
+  - GeneSymbol
+  - gene_name
+
+scoring_method: mean_z
+
+positive_genes:
+  - GSDMD
+  - CASP1
+  - NLRP3
+  - PYCARD
+  - IL1B
+  - IL18
+  - CASP4
+  - CASP5
+  - CCL2
+
+control_genes:
+  - GSDME
+  - CASP3
+  - CD68
+
+output_dir: results/cps_signature/GSE254877
+min_genes_required: 2
+zscore_threshold_high: 0.5

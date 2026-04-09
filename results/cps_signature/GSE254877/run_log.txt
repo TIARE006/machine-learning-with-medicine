@@ -1,0 +1,15 @@
+dataset: GSE254877
+expression_file: data/raw/RNA_seq/GSE254877_counts_matrix_for_cps.csv
+pheno_file: data/raw/RNA_seq/GSE254877_pheno_ab_for_cps.csv
+scoring_method: mean_z
+n_genes_total: 35972
+n_samples_total: 84
+
+positive_genes_requested (9): GSDMD, CASP1, NLRP3, PYCARD, IL1B, IL18, CASP4, CASP5, CCL2
+positive_genes_present   (9): GSDMD, CASP1, NLRP3, PYCARD, IL1B, IL18, CASP4, CASP5, CCL2
+
+control_genes_requested  (3): GSDME, CASP3, CD68
+control_genes_present    (3): GSDME, CASP3, CD68
+
+min_genes_required: 2
+zscore_threshold_high: 0.5
