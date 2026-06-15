@@ -1,0 +1,13 @@
+LOCKED ALL-84 PYROPTOSIS MODULE ANALYSIS
+
+Purpose:
+Identify pyroptosis-module-high versus pyroptosis-module-low molecular states within all 84 cancer-cachexia cohort samples.
+
+Anti-cherry-picking rules:
+1. Use all 84 samples. No Subtype1-like prefiltering.
+2. K=2 is prespecified as a mechanism-driven high/low stratification, not claimed as the global optimal K.
+3. K=2/3/4 consensus metrics are reported together.
+4. Clustering uses only prespecified module genes.
+5. GSDMD, GSDME, IL1B and IL18 are held out from clustering and used only for validation.
+6. Validation is reported with sex, cancer type and myeloid-adjusted models.
+7. If held-out validation fails, the groups should not be called PA/PQ.

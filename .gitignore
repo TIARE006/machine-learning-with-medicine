@@ -3,3 +3,10 @@ __pycache__/
 .vscode/__pycache__/
 *.pyc
 .vscode/
+.RData
+.Rhistory
+Rplots.pdf
+Rlibs/
+*.log
+*.tmp
+*.bak

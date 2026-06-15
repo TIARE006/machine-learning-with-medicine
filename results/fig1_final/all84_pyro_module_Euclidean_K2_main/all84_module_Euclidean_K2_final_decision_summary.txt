@@ -1,0 +1,20 @@
+ALL-84 PYROPTOSIS MODULE EUCLIDEAN K2 MAIN ANALYSIS
+
+Samples analyzed: 84
+K2 group sizes: PyroModuleLow=67;PyroModuleHigh=17
+Sex balance:                  |                  Female Male |   PyroModuleLow      26   41 |   PyroModuleHigh     10    7
+Cancer-type balance:                  |                  Colorectal Pancreas |   PyroModuleLow          38       29 |   PyroModuleHigh          8        9
+Final K4 overlap:                  |                  C1 C2 C3 C4 |   PyroModuleLow  25 10 18 14 |   PyroModuleHigh  2  4  5  6
+
+K2 consensus metrics:
+Mean within-cluster consensus: 0.959
+Mean between-cluster consensus: 0.152
+PAC 0.1-0.9: 0.226
+Mean consensus silhouette: 0.928
+
+GSDMD base logFC/FDR: 0.324/0.0129
+GSDMD myeloid-adjusted logFC/FDR: 0.127/0.273
+Held-out pyroptosis base beta/FDR: 0.768/4.33e-06
+Held-out pyroptosis myeloid-adjusted beta/P: 0.520/0.00056
+
+SUPPORTED: all-84 K2 supports a pyroptosis-module-high state by held-out, myeloid-adjusted validation.

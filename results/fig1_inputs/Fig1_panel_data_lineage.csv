@@ -1,0 +1,9 @@
+panel,direct_input,producer,root_sources
+"A,D,E",results/fig1_inputs/generated/GSE254877_14PCD_ssGSEA_zscores.csv,scripts/fig1/01_expression_inputs/10_build_fig1_expression_inputs.R,GSE254877 RNA counts + pcd_gene_sets.csv
+B-top,results/intNMF_reproducible_two_block/CPI_summary.csv,scripts/fig1/02_intnmf/20_train_reproducible_two_block_intnmf.R,raw RNA/lncRNA/small-RNA + locked feature specification
+"B-bottom,C",results/intNMF_reproducible_two_block/final_consensus_matrix.csv,scripts/fig1/02_intnmf/20_train_reproducible_two_block_intnmf.R,raw RNA/lncRNA/small-RNA + locked feature specification
+"D,E,F,G,H",results/intNMF_reproducible_two_block/two_block_final_K4_labels.csv,scripts/fig1/04_annotate_reproducible_K4.R,reproducible K4 fit + locked pyroptosis annotation rule
+"F,G",results/fig1_final/all84_pyro_module_Euclidean_K2_main/all84_pyro_module_scores_by_sample.csv,scripts/fig1/03_pyroptosis/32_all84_pyro_module_main_figure.R,GSE254877 RNA counts + final K4 labels + locked module genes
+"F,G",results/fig1_final/all84_pyro_module_Euclidean_K2_main/all84_K2_validation_scores_by_sample.csv,scripts/fig1/03_pyroptosis/32_all84_pyro_module_main_figure.R,GSE254877 RNA counts + final K4 labels + held-out genes
+"G,H",results/fig1_final/all84_pyro_module_Euclidean_K2_main/all84_sample_metadata_used.csv,scripts/fig1/03_pyroptosis/32_all84_pyro_module_main_figure.R,GEO phenotype + expression-inferred sex + final K4 labels
+H,results/fig1_inputs/generated/GSE254877_pyroptosis_marker_gene_zmatrix.csv,scripts/fig1/01_expression_inputs/10_build_fig1_expression_inputs.R,GSE254877 RNA counts + fixed marker list

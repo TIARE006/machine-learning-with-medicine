@@ -1,0 +1,55 @@
+project_scope: fig1_only
+active_final_figure: results/fig1_final/intNMF_K4_PA_PQ_final_main_figure/Fig1_intNMF_K4_PA_PQ_final_main_figure.pdf
+run_from: project_root
+local_r_library: Rlibs
+r_setup_script: scripts/fig1/00_setup/00_setup_R_packages.R
+lineage_audit_script: scripts/fig1/12_audit_fig1_lineage.R
+lineage_audit_expected_message: Fig. 1 lineage audit passed for panels A-H.
+active_workflow:
+  - scripts/fig1/01_expression_inputs/11_build_intnmf_source_inputs.R
+  - scripts/fig1/02_intnmf/20_train_reproducible_two_block_intnmf.R
+  - scripts/fig1/04_annotate_reproducible_K4.R
+  - scripts/fig1/01_expression_inputs/10_build_fig1_expression_inputs.R
+  - scripts/fig1/12_audit_fig1_lineage.R
+  - scripts/fig1/03_pyroptosis/32_all84_pyro_module_main_figure.R
+  - scripts/fig1/05_plotting/46_make_final_Fig1_intNMF_K4_PA_PQ.R
+required_cran_packages:
+  - BiocManager
+  - circlize
+  - cluster
+  - cowplot
+  - data.table
+  - digest
+  - dplyr
+  - ggplot2
+  - ggrepel
+  - ggpubr
+  - magick
+  - matrixStats
+  - mclust
+  - NMF
+  - patchwork
+  - pheatmap
+  - purrr
+  - RColorBrewer
+  - readr
+  - scales
+  - stringr
+  - tibble
+  - tidyr
+  - viridisLite
+required_bioconductor_packages:
+  - BiocParallel
+  - ComplexHeatmap
+  - ConsensusClusterPlus
+  - edgeR
+  - GSEABase
+  - GSVA
+  - IntNMF
+  - limma
+  - sva
+active_audit_outputs:
+  - results/fig1_inputs/Fig1_panel_data_lineage.csv
+  - results/fig1_inputs/Fig1_source_hash_audit.csv
+  - results/intNMF_reproducible_two_block/reproducibility_summary.csv
+  - results/intNMF_reproducible_two_block/reproduction_validation/raw_to_fit_reproduction_metrics.csv

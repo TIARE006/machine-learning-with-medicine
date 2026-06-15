@@ -1,0 +1,4 @@
+module,n_genes,genes
+Inflammasome_sensor_adapter,5,NLRP1;NLRP3;NLRC4;AIM2;PYCARD
+Inflammatory_caspase_axis,3,CASP1;CASP4;CASP5
+NOD_gasdermin_related_axis,4,NOD1;NOD2;GSDMB;GSDMC

@@ -1,7 +1,8 @@
-seed: 42
-deg:
-  p_cutoff: 0.01
-  log2FC_cutoff: 0.3
-snf:
-  K: 20
-  t: 20
+project_scope: fig1_only
+active_analysis: intNMF_K4_PA_PQ
+seed_date: 20260615
+selected_K: 4
+medoid_seed: 11
+local_r_library: Rlibs
+active_final_figure: results/fig1_final/intNMF_K4_PA_PQ_final_main_figure/Fig1_intNMF_K4_PA_PQ_final_main_figure.pdf
+lineage_audit: scripts/fig1/12_audit_fig1_lineage.R

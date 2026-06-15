@@ -1,0 +1,7 @@
+package,version
+R,4.6.0
+IntNMF,1.3.0
+NMF,0.28
+edgeR,4.10.1
+limma,3.68.4
+matrixStats,1.5.0

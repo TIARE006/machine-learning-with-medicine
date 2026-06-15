@@ -1,0 +1,21 @@
+Final Fig.1 generated from stable two-block adjusted intNMF K4.
+
+K4 subtype sizes:
+ C1 C2 C3 C4  27 14 23 20 
+
+Merged PA/PQ definition:
+PA = C2 + C4, n = 34.
+PQ = C1 + C3, n = 50.
+
+Panels:
+A: 14-PCD Spearman correlation matrix.
+B: K robustness / K selection plus true K4 consensus matrix.
+C: MDS of intNMF K4 discovery subtypes.
+D: 14 PCD scores across C1-C4.
+E: PA vs PQ 14-PCD adjusted effect forest.
+F: PA vs PQ confirmatory pyroptosis signatures.
+G: Integrated K4/PA-PQ/PCD/pyroptosis heatmap.
+H: Core pyroptosis-gene heatmap across PA vs PQ.
+
+Final PNG: results/fig1_final/intNMF_K4_PA_PQ_final_main_figure/Fig1_intNMF_K4_PA_PQ_final_main_figure.png
+Final PDF: results/fig1_final/intNMF_K4_PA_PQ_final_main_figure/Fig1_intNMF_K4_PA_PQ_final_main_figure.pdf

@@ -1,268 +1,73 @@
-# RNA & smallRNA Analysis Pipeline: Clustering, Differential Expression, and Pathway Enrichment
+# Fig. 1 intNMF K4 PA/PQ Reproducible Analysis
 
-## Project Overview
+This project is currently scoped to the Fig. 1 analysis only.
 
-This project implements a complete analysis pipeline for two GEO datasets:
+Active final output:
 
-- **small RNA-seq (GSE254878)**
-- **RNA-seq (GSE254877)**
+`results/fig1_final/intNMF_K4_PA_PQ_final_main_figure/Fig1_intNMF_K4_PA_PQ_final_main_figure.pdf`
 
-The pipeline performs four major steps:
+## Reproducibility Status
 
-1. **Unsupervised clustering** based on normalized expression data  
-2. **Differential expression analysis (DEG)** using strict and relaxed thresholds  
-3. **Target gene mapping** for small RNA (miRNA → mRNA) through curated reference tables  
-4. **GO Biological Process pathway enrichment**, for both directly differential genes and miRNA-derived target genes
+The active Fig. 1 workflow is designed to be traceable from retained raw inputs to the final plotted values.
 
-All intermediate and final outputs — clustering labels, DEG tables, gene lists, and pathway enrichment results — are saved under a structured `data/` directory.
+- Root inputs, generated inputs, model outputs, and final panel inputs are recorded with SHA-256 hashes.
+- The active intNMF solution uses a locked two-block feature specification.
+- K=4 is selected by fixed-seed CPI screening.
+- Twenty fixed K4 seed runs are stable with pairwise ARI mean and minimum equal to 1.
+- An independent seed-11 raw-to-fit rerun reproduces the active result with ARI 1 and consensus-matrix maximum absolute difference 0.
 
----
+Machine-readable audit outputs:
 
-# Data Folder Overview
+- `results/fig1_inputs/Fig1_panel_data_lineage.csv`
+- `results/fig1_inputs/Fig1_source_hash_audit.csv`
+- `results/intNMF_reproducible_two_block/reproducibility_summary.csv`
+- `results/intNMF_reproducible_two_block/reproduction_validation/raw_to_fit_reproduction_metrics.csv`
 
-This folder contains all data used by the clustering and DEG + pathway analysis pipelines for:
+## Setup
 
-- **small RNA-seq**: GSE254878  
-- **RNA-seq**: GSE254877  
+Run all commands from the project root.
 
-The Python scripts (e.g. `cluster_analysis1.py`, `de_analysis_pipeline.py`) assume the following structure **relative to the project root**:
+```powershell
+Rscript scripts/fig1/00_setup/00_setup_R_packages.R
+```
+
+The setup script installs required R packages into the project-local `Rlibs/` directory. The project `.Rprofile` also prepends `Rlibs/` to `.libPaths()` when R starts in this directory.
+
+## Reproduce Fig. 1
+
+```powershell
+Rscript scripts/fig1/01_expression_inputs/11_build_intnmf_source_inputs.R
+Rscript scripts/fig1/02_intnmf/20_train_reproducible_two_block_intnmf.R
+Rscript scripts/fig1/04_annotate_reproducible_K4.R
+Rscript scripts/fig1/01_expression_inputs/10_build_fig1_expression_inputs.R
+Rscript scripts/fig1/12_audit_fig1_lineage.R
+Rscript scripts/fig1/03_pyroptosis/32_all84_pyro_module_main_figure.R
+Rscript scripts/fig1/05_plotting/46_make_final_Fig1_intNMF_K4_PA_PQ.R
+```
+
+The lineage audit can be rerun at any time:
+
+```powershell
+Rscript scripts/fig1/12_audit_fig1_lineage.R
+```
+
+Expected message:
 
 ```text
-data/
-├── small RNA-seq/
-│   ├── raw/
-│   │   └── GSE254878_smallRNAs_raw_counts_expression.csv
-│   ├── clustering/
-│   │   └── cluster_results_smallRNA_seed42.csv
-│   ├── deg/
-│   │   ├── DEG_full_smallRNA_seed42.csv
-│   │   ├── DEG_sig_strict_smallRNA_FDR0.05_log2FC1.0_seed42.csv
-│   │   ├── DEG_sig_relaxed_smallRNA_FDR0.1_log2FC0.5_seed42.csv
-│   │   ├── DEG_top200_smallRNA_seed42.csv
-│   │   ├── DEG_up_genes_smallRNA_seed42.txt
-│   │   └── DEG_down_genes_smallRNA_seed42.txt
-│   ├── pathway/
-│   │   ├── Pathway_up_smallRNA_seed42.csv
-│   │   ├── Pathway_down_smallRNA_seed42.csv
-│   │   ├── Pathway_targets_up_smallRNA_seed42.csv
-│   │   └── Pathway_targets_down_smallRNA_seed42.csv
-│   └── targets/
-│       ├── Targets_up_from_smallRNA_seed42.txt
-│       └── Targets_down_from_smallRNA_seed42.txt
-│
-├── RNA-seq/
-│   ├── raw/
-│   │   └── GSE254877_raw_counts_expression.csv
-│   ├── clustering/
-│   │   └── cluster_results_RNA_seed42.csv
-│   ├── deg/
-│   │   ├── DEG_full_RNA_seed42.csv
-│   │   ├── DEG_sig_strict_RNA_FDR0.05_log2FC1.0_seed42.csv
-│   │   ├── DEG_sig_relaxed_RNA_FDR0.1_log2FC0.5_seed42.csv
-│   │   ├── DEG_top200_RNA_seed42.csv
-│   │   ├── DEG_up_genes_RNA_seed42.txt
-│   │   └── DEG_down_genes_RNA_seed42.txt
-│   └── pathway/
-│       ├── Pathway_up_RNA_seed42.csv
-│       └── Pathway_down_RNA_seed42.csv
-│
-└── reference/
-    ├── gene_attribute_edges.txt.gz
-    └── mirna_target_human.csv
-
-Folder-by-folder description
-1. small RNA-seq/
-raw/
-
-GSE254878_smallRNAs_raw_counts_expression.csv
-Raw small RNA counts from GEO (GSE254878).
-
-Rows: features (miRNA / snoRNA / tRNA, etc.)
-
-Columns: samples (patients).
-
-The first row is a description row and is removed in the code.
-
-The first column is used as the feature ID.
-
-clustering/
-
-cluster_results_smallRNA_seed42.csv
-Final clustering result for small RNA-seq.
-
-Columns:
-
-Sample_ID: sample name (matches the columns of the raw expression file)
-
-Cluster: cluster label (0 / 1, etc.), used later for DEG analysis.
-
-deg/ (Differential Expression Results for small RNA)
-
-All these files are generated by de_analysis_pipeline.py with DATA_TYPE = "smallRNA".
-
-DEG_full_smallRNA_seed42.csv
-Full differential expression table for all small RNA features. Columns:
-
-gene (feature ID)
-
-log2FC (Cluster 0 vs Cluster 1)
-
-p_value
-
-FDR (BH-corrected)
-
-DEG_sig_strict_smallRNA_FDR0.05_log2FC1.0_seed42.csv
-“Strict” significant small RNAs:
-
-FDR < 0.05
-
-|log2FC| > 1.0
-→ This is the main DEG list for reporting.
-
-DEG_sig_relaxed_smallRNA_FDR0.1_log2FC0.5_seed42.csv
-“Relaxed” DEGs, used mostly for enrichment and target mapping:
-
-FDR < 0.10
-
-|log2FC| > 0.5
-
-DEG_top200_smallRNA_seed42.csv
-Top 200 features ranked by raw p-value (exploratory use).
-
-DEG_up_genes_smallRNA_seed42.txt
-One ID per line: small RNAs up-regulated in cluster 0 vs cluster 1 (relaxed cutoff).
-Used as input smallRNA list for miRNA→mRNA mapping.
-
-DEG_down_genes_smallRNA_seed42.txt
-Down-regulated small RNAs (relaxed cutoff).
-
-pathway/ (GO enrichment for smallRNA and their targets)
-
-Pathway_up_smallRNA_seed42.csv
-GO Biological Process enrichment for up-regulated small RNAs
-(directly using small RNA IDs; mainly for reference).
-
-Pathway_down_smallRNA_seed42.csv
-GO-BP enrichment for down-regulated small RNAs.
-
-Pathway_targets_up_smallRNA_seed42.csv
-GO-BP enrichment for target mRNAs of up-regulated smallRNAs
-(i.e., after miRNA→mRNA mapping, enrichment is run on the mRNA gene list).
-
-Pathway_targets_down_smallRNA_seed42.csv
-GO-BP enrichment for target mRNAs of down-regulated smallRNAs (may be empty).
-
-targets/ (miRNA → mRNA target lists)
-
-Targets_up_from_smallRNA_seed42.txt
-Unique mRNA target genes of up-regulated smallRNAs (one gene symbol per line).
-
-Targets_down_from_smallRNA_seed42.txt
-Unique mRNA target genes of down-regulated smallRNAs.
-
-These files are used as the gene lists for Pathway_targets_*.csv.
-
-2. RNA-seq/
-raw/
-
-GSE254877_raw_counts_expression.csv
-Raw mRNA counts from GEO (GSE254877).
-
-Rows: genes
-
-Columns: samples
-
-First row is a description row (removed in the code).
-
-First column is used as gene ID.
-
-clustering/
-
-cluster_results_RNA_seed42.csv
-Clustering result for RNA-seq, same format as for small RNA:
-
-Sample_ID
-
-Cluster
-
-deg/ (Differential Expression Results for mRNA)
-
-Generated by de_analysis_pipeline.py with DATA_TYPE = "RNA".
-
-DEG_full_RNA_seed42.csv
-DEG table for all genes.
-
-DEG_sig_strict_RNA_FDR0.05_log2FC1.0_seed42.csv
-Strict-significance mRNA DEGs (FDR < 0.05 and |log2FC| > 1.0).
-
-DEG_sig_relaxed_RNA_FDR0.1_log2FC0.5_seed42.csv
-Relaxed mRNA DEGs (FDR < 0.10 and |log2FC| > 0.5).
-
-DEG_top200_RNA_seed42.csv
-Top 200 genes by p-value.
-
-DEG_up_genes_RNA_seed42.txt / DEG_down_genes_RNA_seed42.txt
-Up-/down-regulated genes (relaxed cutoff). Used as input for enrichment.
-
-pathway/ (GO enrichment for mRNA)
-
-Pathway_up_RNA_seed42.csv
-GO-BP enrichment result for up-regulated mRNA genes.
-
-Pathway_down_RNA_seed42.csv
-GO-BP enrichment result for down-regulated mRNA genes.
-
-3. reference/
-
-Files used to build the miRNA→target gene mapping.
-
-gene_attribute_edges.txt.gz
-Raw edge list downloaded from the miRTarBase / Enrichr resource.
-Contains columns like:
-source, source_desc, source_id, target, target_desc, target_id, weight.
-
-mirna_target_human.csv
-Preprocessed human miRNA–target table.
-Built from gene_attribute_edges.txt.gz by build_mirna_target_table.py.
-
-Columns:
-
-miRNA – miRNA ID (e.g. hsa-miR-154-5p)
-
-TargetGene – human gene symbol (e.g. DICER1)
-
-This file is used by de_analysis_pipeline.py when DATA_TYPE = "smallRNA" to map
-differential miRNAs to their target mRNAs before running GO-BP enrichment.
-
-Quick usage note
-
-Set DATA_TYPE = "smallRNA" or "RNA" in de_analysis_pipeline.py.
-
-The script will:
-
-Read the corresponding raw/ expression file and clustering/ labels.
-
-Compute DEGs (full / strict / relaxed / Top N).
-
-For RNA-seq: run GO-BP enrichment directly on up/down DEG gene lists.
-
-For small RNA-seq:
-
-map differential miRNAs to target mRNAs using reference/mirna_target_human.csv;
-
-run GO-BP enrichment on the target mRNA gene lists.
-
-
-中文速记
-
-raw/：原始表达矩阵（GEO 下载后整理过的 counts）。
-
-clustering/：聚类结果（Sample_ID + Cluster），后面所有 DEG 都基于这个分组。
-
-deg/：差异分析结果（全表、严格阈值、宽松阈值、Top N、上下调列表）。
-
-pathway/：GO Biological Process 富集结果（直接基因，或者 smallRNA 映射后的靶基因）。
-
-targets/：smallRNA → mRNA 的靶基因列表（只对 small RNA-seq 有意义）。
-
-reference/：用来构建 smallRNA→靶点映射的参考数据库文件。
+Fig. 1 lineage audit passed for panels A-H.
+```
+
+## Active Directories
+
+- `scripts/fig1/`: active Fig. 1 workflow scripts.
+- `scripts/fig1/01_expression_inputs/`: raw-derived Fig. 1 input builders and locked gene/feature definitions.
+- `scripts/fig1/02_intnmf/`: reproducible intNMF training and validation scripts.
+- `scripts/fig1/03_pyroptosis/`: pyroptosis module scoring for Fig. 1.
+- `scripts/fig1/05_plotting/`: final Fig. 1 plotting script.
+- `results/fig1_inputs/`: generated Fig. 1 inputs and lineage audits.
+- `results/intNMF_reproducible_two_block/`: active reproducible K4 model outputs.
+- `results/fig1_final/intNMF_K4_PA_PQ_final_main_figure/`: final Fig. 1 panels and assembled figure.
+
+## Scope Note
+
+Older Fig. 2-Fig. 7, exploratory, and legacy figure materials are not part of the active reproducible analysis scope.

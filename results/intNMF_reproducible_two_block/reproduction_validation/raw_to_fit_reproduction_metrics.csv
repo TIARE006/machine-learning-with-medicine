@@ -1,0 +1,2 @@
+seed,adjusted_rand_index,consensus_max_abs_diff,reference_cluster_sizes,reproduced_cluster_sizes
+11,1,0,27;20;14;23,27;20;14;23
